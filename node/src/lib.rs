@@ -1,4 +1,6 @@
-mod tree;
+mod merkle_dids;
+
+pub use merkle_dids::*;
 
 #[cfg(test)]
 mod tests {

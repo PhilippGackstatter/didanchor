@@ -5,9 +5,16 @@ edition = "2021"
 
 
 [dependencies]
+anyhow = "1"
 identity_iota_core = "0.6.1"
+identity_core = "0.6.1"
+identity_did = "0.6.1"
 identity_iota_client = "0.6.1"
-iota-crypto = { version = "0.13.0", features = ["blake2b", "sha"], default-features = false }
+iota-crypto = { version = "0.13.0", features = [
+  "blake2b",
+  "sha",
+], default-features = false }
+merkle_tree = { path = "../merkle_tree" }
 
 [dependencies.iota-client]
 git = "https://github.com/iotaledger/iota.rs"
@@ -15,3 +22,6 @@ rev = "a582bfa882793fe21db2055c4f7878ebc531877a" # develop branch, 2022-07-27
 features = ["tls"]
 default-features = false
 optional = true
+
+[dev-dependencies]
+rand = "0.8.5"

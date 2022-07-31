@@ -14,6 +14,12 @@ impl<T> MerkleTree<T>
 where
     T: AsRef<[u8]>,
 {
+    pub fn new() -> Self {
+        Self {
+            leaves: Default::default(),
+        }
+    }
+
     pub fn root<D>(&self) -> Vec<u8>
     where
         D: DigestExt,
