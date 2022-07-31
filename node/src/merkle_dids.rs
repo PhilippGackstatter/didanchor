@@ -93,11 +93,11 @@ mod tests {
         common::Url,
         crypto::{KeyPair, KeyType},
     };
-    use identity_did::did::DID;
+    use identity_did::{did::DID, verification::MethodScope};
     use identity_iota_client::{document::ResolvedIotaDocument, tangle::TangleRef};
     use identity_iota_core::{
         did::IotaDID,
-        document::{IotaDocument, IotaService},
+        document::{IotaDocument, IotaService, IotaVerificationMethod},
         tangle::MessageId,
     };
 
@@ -190,6 +190,60 @@ mod tests {
                 "http://example.com/service/",
             ));
         });
+
+        merkle_dids.update_document(doc).unwrap();
+    }
+
+    #[test]
+    fn test_merkle_dids_rotate_keys() {
+        let (keypair, document) = gen_document();
+
+        let mut doc = ResolvedIotaDocument::from(document);
+        let doc_message_id = random_message_id();
+        doc.set_message_id(doc_message_id);
+
+        let mut merkle_dids = MerkleDIDs::new();
+
+        merkle_dids.update_document(doc.clone()).unwrap();
+
+        let keypair2 = KeyPair::new(KeyType::Ed25519).unwrap();
+
+        let mut doc = update_document(&keypair, doc, |document| {
+            let method: IotaVerificationMethod = IotaVerificationMethod::new(
+                document.id().to_owned(),
+                keypair2.type_(),
+                keypair2.public(),
+                "#key-2",
+            )
+            .unwrap();
+
+            document
+                .insert_method(method, MethodScope::capability_invocation())
+                .unwrap();
+        });
+
+        merkle_dids.update_document(doc.clone()).unwrap();
+
+        doc.document
+            .remove_method(
+                &doc.document
+                    .id()
+                    .to_url()
+                    .join(format!("#{}", IotaDocument::DEFAULT_METHOD_FRAGMENT))
+                    .unwrap(),
+            )
+            .unwrap();
+
+        doc.document.metadata.previous_message_id = doc.message_id().clone();
+
+        doc.document
+            .sign_self(
+                keypair2.private(),
+                doc.document.id().to_url().join("#key-2").unwrap(),
+            )
+            .unwrap();
+
+        doc.set_message_id(random_message_id());
 
         merkle_dids.update_document(doc).unwrap();
     }
