@@ -1,42 +1,15 @@
 use std::collections::{hash_map::Entry, HashMap};
 
 use crypto::hashes::blake2b::Blake2b256;
-use identity_core::convert::ToJson;
 use identity_iota_client::{chain::IntegrationChain, document::ResolvedIotaDocument};
 use identity_iota_core::did::IotaDID;
 use merkle_tree::{MerkleTree, Proof};
 
-/// The index of a [`ChainOfCustodySerialized`] in a [`MerkleTree`].
-type MerkleTreeIndex = usize;
-
-#[derive(Debug, Clone, Default)]
-pub struct ChainOfCustody(Vec<ResolvedIotaDocument>, MerkleTreeIndex);
-
-impl ChainOfCustody {
-    pub fn serialize(&self) -> anyhow::Result<ChainOfCustodySerialized> {
-        let mut serialized = Vec::new();
-
-        for doc in self.0.iter() {
-            let bytes = doc.to_json_vec()?;
-            serialized.extend(bytes);
-        }
-
-        Ok(ChainOfCustodySerialized(serialized))
-    }
-}
-
-#[derive(Debug, Clone, Default)]
-pub struct ChainOfCustodySerialized(Vec<u8>);
-
-impl AsRef<[u8]> for ChainOfCustodySerialized {
-    fn as_ref(&self) -> &[u8] {
-        self.0.as_slice()
-    }
-}
+use crate::{ChainOfCustody, IndexedChainOfCustody, SerializedChainOfCustody};
 
 pub struct MerkleDIDs {
-    merkle_tree: MerkleTree<ChainOfCustodySerialized>,
-    document_tree: HashMap<IotaDID, ChainOfCustody>,
+    merkle_tree: MerkleTree<SerializedChainOfCustody>,
+    document_tree: HashMap<IotaDID, IndexedChainOfCustody>,
 }
 
 impl MerkleDIDs {
@@ -51,7 +24,7 @@ impl MerkleDIDs {
     pub fn update_document(&mut self, document: ResolvedIotaDocument) -> anyhow::Result<()> {
         match self.document_tree.entry(document.document.id().to_owned()) {
             Entry::Occupied(mut entry) => {
-                let mut iterator = entry.get().0.iter();
+                let mut iterator = entry.get().chain_of_custody.0.iter();
 
                 let mut chain = IntegrationChain::new(
                     iterator
@@ -68,14 +41,14 @@ impl MerkleDIDs {
 
                 chain.check_valid_addition(&document)?;
 
-                entry.get_mut().0.push(document);
+                entry.get_mut().chain_of_custody.0.push(document);
 
                 // Update Merkle Tree.
                 // Serialize the entire chain of custody.
 
-                let serialized = entry.get().serialize()?;
+                let serialized = entry.get().chain_of_custody.serialize_to_vec()?;
 
-                let index: MerkleTreeIndex = entry.get().1;
+                let index: usize = entry.get().merkle_tree_index;
 
                 self.merkle_tree.replace(index, serialized);
             }
@@ -83,15 +56,16 @@ impl MerkleDIDs {
                 // Make sure it's a valid root document.
                 IntegrationChain::new(document.clone())?;
 
-                let mut coc = ChainOfCustody(vec![document], 0);
+                let chain_of_custody: ChainOfCustody = ChainOfCustody(vec![document]);
 
-                let serialized: ChainOfCustodySerialized = coc.serialize()?;
+                let serialized: SerializedChainOfCustody = chain_of_custody.serialize_to_vec()?;
 
-                let index: MerkleTreeIndex = self.merkle_tree.push(serialized);
+                let merkle_tree_index: usize = self.merkle_tree.push(serialized);
 
-                coc.1 = index;
-
-                entry.insert(coc);
+                entry.insert(IndexedChainOfCustody {
+                    chain_of_custody,
+                    merkle_tree_index,
+                });
             }
         }
 
@@ -103,12 +77,13 @@ impl MerkleDIDs {
     }
 
     pub fn generate_merkle_proof(&self, did: &IotaDID) -> Option<Proof<Blake2b256>> {
-        let entry: &ChainOfCustody = self.document_tree.get(did)?;
-        self.merkle_tree.generate_proof::<Blake2b256>(entry.1)
+        let entry: &IndexedChainOfCustody = self.document_tree.get(did)?;
+        self.merkle_tree
+            .generate_proof::<Blake2b256>(entry.merkle_tree_index)
     }
 
     pub fn chain_of_custody(&self, did: &IotaDID) -> Option<&ChainOfCustody> {
-        self.document_tree.get(did)
+        self.document_tree.get(did).map(|coc| &coc.chain_of_custody)
     }
 }
 
@@ -253,7 +228,7 @@ mod tests {
         let document3_proof = merkle_dids.generate_merkle_proof(document3.did()).unwrap();
 
         let coc = merkle_dids.chain_of_custody(document3.did()).unwrap();
-        let coc_serialized = coc.serialize().unwrap();
+        let coc_serialized = coc.serialize_to_vec().unwrap();
 
         assert!(document3_proof.verify(merkle_dids.merkle_root().as_ref(), coc_serialized))
     }
