@@ -1,0 +1,17 @@
+[package]
+name = "node"
+version = "0.1.0"
+edition = "2021"
+
+
+[dependencies]
+identity_iota_core = "0.6.1"
+identity_iota_client = "0.6.1"
+iota-crypto = { version = "0.13.0", features = ["blake2b", "sha"], default-features = false }
+
+[dependencies.iota-client]
+git = "https://github.com/iotaledger/iota.rs"
+rev = "a582bfa882793fe21db2055c4f7878ebc531877a" # develop branch, 2022-07-27
+features = ["tls"]
+default-features = false
+optional = true
