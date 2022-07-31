@@ -20,6 +20,17 @@ where
         }
     }
 
+    pub fn push(&mut self, element: T) -> usize {
+        self.leaves.push(element);
+        self.leaves.len() - 1
+    }
+
+    pub fn replace(&mut self, index: usize, mut element: T) {
+        if let Some(leaf) = self.leaves.get_mut(index) {
+            std::mem::swap(leaf, &mut element);
+        }
+    }
+
     pub fn root<D>(&self) -> Vec<u8>
     where
         D: DigestExt,
