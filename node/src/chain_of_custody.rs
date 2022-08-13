@@ -18,11 +18,4 @@ impl ChainOfCustody {
     }
 }
 
-/// A [`ChainOfCustody`] together with the index of the leaf in the associated merkle tree.
-#[derive(Debug, Clone, Default)]
-pub(crate) struct IndexedChainOfCustody {
-    pub chain_of_custody: ChainOfCustody,
-    pub merkle_tree_index: usize,
-}
-
 pub type SerializedChainOfCustody = Vec<u8>;

@@ -1,15 +1,16 @@
-use std::collections::{hash_map::Entry, HashMap};
+use std::collections::HashMap;
 
 use crypto::hashes::blake2b::Blake2b256;
 use identity_iota_client::{chain::IntegrationChain, document::ResolvedIotaDocument};
 use identity_iota_core::did::IotaDID;
 use merkle_tree::{MerkleTree, Proof};
 
-use crate::{ChainOfCustody, IndexedChainOfCustody, SerializedChainOfCustody};
+use crate::{ChainOfCustody, SerializedChainOfCustody};
 
+#[derive(Clone)]
 pub struct MerkleDIDs {
-    merkle_tree: MerkleTree<SerializedChainOfCustody>,
-    document_tree: HashMap<IotaDID, IndexedChainOfCustody>,
+    merkle_tree: MerkleTree<Blake2b256>,
+    document_tree: HashMap<IotaDID, usize>,
 }
 
 impl MerkleDIDs {
@@ -21,10 +22,14 @@ impl MerkleDIDs {
     }
 
     /// Updates the document or inserts it if it doesn't exist.
-    pub fn update_document(&mut self, document: ResolvedIotaDocument) -> anyhow::Result<()> {
-        match self.document_tree.entry(document.document.id().to_owned()) {
-            Entry::Occupied(mut entry) => {
-                let mut iterator = entry.get().chain_of_custody.0.iter();
+    pub fn update_document(
+        &mut self,
+        chain_of_custody: Option<ChainOfCustody>,
+        document: ResolvedIotaDocument,
+    ) -> anyhow::Result<ChainOfCustody> {
+        match chain_of_custody {
+            Some(mut chain_of_custody) => {
+                let mut iterator = chain_of_custody.0.iter();
 
                 let mut chain = IntegrationChain::new(
                     iterator
@@ -41,20 +46,28 @@ impl MerkleDIDs {
 
                 chain.check_valid_addition(&document)?;
 
-                entry.get_mut().chain_of_custody.0.push(document);
+                let did: IotaDID = document.document.id().to_owned();
+                chain_of_custody.0.push(document);
 
                 // Update Merkle Tree.
                 // Serialize the entire chain of custody.
 
-                let serialized = entry.get().chain_of_custody.serialize_to_vec()?;
+                let serialized = chain_of_custody.serialize_to_vec()?;
 
-                let index: usize = entry.get().merkle_tree_index;
+                let index: usize = *self
+                    .document_tree
+                    .get(&did)
+                    .expect("the index should exist if a chain of custody exists");
 
                 self.merkle_tree.replace(index, serialized);
+
+                Ok(chain_of_custody)
             }
-            Entry::Vacant(entry) => {
+            None => {
                 // Make sure it's a valid root document.
                 IntegrationChain::new(document.clone())?;
+
+                let did: IotaDID = document.document.id().to_owned();
 
                 let chain_of_custody: ChainOfCustody = ChainOfCustody(vec![document]);
 
@@ -62,28 +75,26 @@ impl MerkleDIDs {
 
                 let merkle_tree_index: usize = self.merkle_tree.push(serialized);
 
-                entry.insert(IndexedChainOfCustody {
-                    chain_of_custody,
-                    merkle_tree_index,
-                });
+                self.document_tree.insert(did, merkle_tree_index);
+
+                Ok(chain_of_custody)
             }
         }
-
-        Ok(())
     }
 
     pub fn merkle_root(&self) -> Vec<u8> {
-        self.merkle_tree.root::<Blake2b256>()
+        self.merkle_tree.root()
     }
 
     pub fn generate_merkle_proof(&self, did: &IotaDID) -> Option<Proof<Blake2b256>> {
-        let entry: &IndexedChainOfCustody = self.document_tree.get(did)?;
-        self.merkle_tree
-            .generate_proof::<Blake2b256>(entry.merkle_tree_index)
+        let merkle_tree_index: &usize = self.document_tree.get(did)?;
+        self.merkle_tree.generate_proof(*merkle_tree_index)
     }
+}
 
-    pub fn chain_of_custody(&self, did: &IotaDID) -> Option<&ChainOfCustody> {
-        self.document_tree.get(did).map(|coc| &coc.chain_of_custody)
+impl Default for MerkleDIDs {
+    fn default() -> Self {
+        Self::new()
     }
 }
 
@@ -144,7 +155,7 @@ mod tests {
     {
         f(&mut doc.document);
 
-        doc.document.metadata.previous_message_id = doc.message_id().clone();
+        doc.document.metadata.previous_message_id = *doc.message_id();
 
         doc.document
             .sign_self(
@@ -160,27 +171,25 @@ mod tests {
 
     #[test]
     fn test_merkle_dids_create_document() {
-        let (_keypair, document) = gen_document();
+        let (_keypair, mut doc) = gen_document();
 
-        let mut doc = ResolvedIotaDocument::from(document);
         doc.set_message_id(random_message_id());
 
         let mut merkle_dids = MerkleDIDs::new();
 
-        merkle_dids.update_document(doc).unwrap();
+        merkle_dids.update_document(None, doc).unwrap();
     }
 
     #[test]
     fn test_merkle_dids_update_document() {
-        let (keypair, document) = gen_document();
+        let (keypair, mut doc) = gen_document();
 
-        let mut doc = ResolvedIotaDocument::from(document);
         let doc_message_id = random_message_id();
         doc.set_message_id(doc_message_id);
 
         let mut merkle_dids = MerkleDIDs::new();
 
-        merkle_dids.update_document(doc.clone()).unwrap();
+        let coc = merkle_dids.update_document(None, doc.clone()).unwrap();
 
         let doc = update_document(&keypair, doc, |document| {
             document.insert_service(service(
@@ -191,20 +200,19 @@ mod tests {
             ));
         });
 
-        merkle_dids.update_document(doc).unwrap();
+        merkle_dids.update_document(Some(coc), doc).unwrap();
     }
 
     #[test]
     fn test_merkle_dids_rotate_keys() {
-        let (keypair, document) = gen_document();
+        let (keypair, mut doc) = gen_document();
 
-        let mut doc = ResolvedIotaDocument::from(document);
         let doc_message_id = random_message_id();
         doc.set_message_id(doc_message_id);
 
         let mut merkle_dids = MerkleDIDs::new();
 
-        merkle_dids.update_document(doc.clone()).unwrap();
+        let coc = merkle_dids.update_document(None, doc.clone()).unwrap();
 
         let keypair2 = KeyPair::new(KeyType::Ed25519).unwrap();
 
@@ -222,7 +230,7 @@ mod tests {
                 .unwrap();
         });
 
-        merkle_dids.update_document(doc.clone()).unwrap();
+        let coc = merkle_dids.update_document(Some(coc), doc.clone()).unwrap();
 
         doc.document
             .remove_method(
@@ -234,7 +242,7 @@ mod tests {
             )
             .unwrap();
 
-        doc.document.metadata.previous_message_id = doc.message_id().clone();
+        doc.document.metadata.previous_message_id = *doc.message_id();
 
         doc.document
             .sign_self(
@@ -245,7 +253,7 @@ mod tests {
 
         doc.set_message_id(random_message_id());
 
-        merkle_dids.update_document(doc).unwrap();
+        merkle_dids.update_document(Some(coc), doc).unwrap();
     }
 
     #[test]
@@ -257,10 +265,12 @@ mod tests {
 
         let mut merkle_dids = MerkleDIDs::new();
 
-        merkle_dids.update_document(document1).unwrap();
-        merkle_dids.update_document(document2).unwrap();
-        merkle_dids.update_document(document3.clone()).unwrap();
-        merkle_dids.update_document(document4).unwrap();
+        merkle_dids.update_document(None, document1).unwrap();
+        merkle_dids.update_document(None, document2).unwrap();
+        let coc3 = merkle_dids
+            .update_document(None, document3.clone())
+            .unwrap();
+        merkle_dids.update_document(None, document4).unwrap();
 
         let document3 = update_document(&keypair3, document3, |document| {
             let service = IotaService::builder(Default::default())
@@ -277,12 +287,13 @@ mod tests {
             document.insert_service(service);
         });
 
-        merkle_dids.update_document(document3.clone()).unwrap();
+        let coc3 = merkle_dids
+            .update_document(Some(coc3), document3.clone())
+            .unwrap();
 
         let document3_proof = merkle_dids.generate_merkle_proof(document3.did()).unwrap();
 
-        let coc = merkle_dids.chain_of_custody(document3.did()).unwrap();
-        let coc_serialized = coc.serialize_to_vec().unwrap();
+        let coc_serialized = coc3.serialize_to_vec().unwrap();
 
         assert!(document3_proof.verify(merkle_dids.merkle_root().as_ref(), coc_serialized))
     }

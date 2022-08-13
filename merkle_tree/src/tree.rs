@@ -3,54 +3,59 @@ use digest::Output;
 use crate::{digest_ext::DigestExt, node::Node, proof::Proof};
 
 /// A merkle tree generic over some type that can be referenced as bytes.
-pub struct MerkleTree<T>
+#[derive(Default, Debug, Clone)]
+pub struct MerkleTree<D>
 where
-    T: AsRef<[u8]>,
+    D: DigestExt,
 {
-    leaves: Vec<T>,
+    leaves: Vec<Output<D>>,
 }
 
-impl<T> MerkleTree<T>
-where
-    T: AsRef<[u8]>,
-{
+impl<D: DigestExt> MerkleTree<D> {
     pub fn new() -> Self {
         Self {
             leaves: Default::default(),
         }
     }
 
-    pub fn push(&mut self, element: T) -> usize {
-        self.leaves.push(element);
+    pub fn push(&mut self, element: impl AsRef<[u8]>) -> usize {
+        let hash: Output<D> = D::new().hash_leaf(element.as_ref());
+        self.leaves.push(hash);
         self.leaves.len() - 1
     }
 
-    pub fn replace(&mut self, index: usize, mut element: T) {
+    pub fn push_pre_hash(&mut self, pre_hash: Output<D>) -> usize {
+        self.leaves.push(pre_hash);
+        self.leaves.len() - 1
+    }
+
+    pub fn replace(&mut self, index: usize, element: impl AsRef<[u8]>) {
         if let Some(leaf) = self.leaves.get_mut(index) {
-            std::mem::swap(leaf, &mut element);
+            let mut hash: Output<D> = D::new().hash_leaf(element.as_ref());
+            std::mem::swap(leaf, &mut hash);
         }
     }
 
-    pub fn root<D>(&self) -> Vec<u8>
-    where
-        D: DigestExt,
-    {
-        compute_merkle_root::<D, _>(&self.leaves).to_vec()
+    pub fn replace_pre_hash(&mut self, index: usize, mut pre_hash: Output<D>) {
+        if let Some(leaf) = self.leaves.get_mut(index) {
+            std::mem::swap(leaf, &mut pre_hash);
+        }
     }
 
-    pub fn generate_proof<D>(&self, index: usize) -> Option<Proof<D>>
-    where
-        D: DigestExt,
-    {
+    pub fn root(&self) -> Vec<u8> {
+        compute_merkle_root::<D>(&self.leaves).to_vec()
+    }
+
+    pub fn generate_proof(&self, index: usize) -> Option<Proof<D>> {
         compute_merkle_proof(&self.leaves, index)
     }
 }
 
-impl<T> From<Vec<T>> for MerkleTree<T>
+impl<D> From<Vec<Output<D>>> for MerkleTree<D>
 where
-    T: AsRef<[u8]>,
+    D: DigestExt,
 {
-    fn from(leaves: Vec<T>) -> Self {
+    fn from(leaves: Vec<Output<D>>) -> Self {
         Self { leaves }
     }
 }
@@ -61,20 +66,18 @@ where
 ///
 /// For types implementing [`AsRef<[u8]>`][`AsRef`], the values will be hashed
 /// according to the [`Digest`][`DigestExt`] implementation, `D`.
-pub fn compute_merkle_root<D, L>(leaves: &[L]) -> Output<D>
+pub fn compute_merkle_root<D>(leaves: &[Output<D>]) -> Output<D>
 where
     D: DigestExt,
-    L: AsRef<[u8]>,
 {
     #[inline]
-    fn __generate<D, L>(digest: &mut D, leaves: &[L]) -> Output<D>
+    fn __generate<D>(digest: &mut D, leaves: &[Output<D>]) -> Output<D>
     where
         D: DigestExt,
-        L: AsRef<[u8]>,
     {
         match leaves {
             [] => digest.hash_empty(),
-            [leaf] => digest.hash_leaf(leaf.as_ref()),
+            [leaf] => leaf.clone(),
             leaves => {
                 let (this, that): _ = __split_pow2(leaves);
 
@@ -86,31 +89,29 @@ where
         }
     }
 
-    __generate::<D, L>(&mut D::new(), leaves)
+    __generate::<D>(&mut D::new(), leaves)
 }
 
 /// Generate a proof-of-inclusion for the leaf node at the specified `index`.
-pub fn compute_merkle_proof<D, L>(leaves: &[L], index: usize) -> Option<Proof<D>>
+pub fn compute_merkle_proof<D>(leaves: &[Output<D>], index: usize) -> Option<Proof<D>>
 where
     D: DigestExt,
-    L: AsRef<[u8]>,
 {
     #[inline]
-    fn __generate<D, L>(digest: &mut D, path: &mut Vec<Node<D>>, leaves: &[L], index: usize)
+    fn __generate<D>(digest: &mut D, path: &mut Vec<Node<D>>, leaves: &[Output<D>], index: usize)
     where
         D: DigestExt,
-        L: AsRef<[u8]>,
     {
         if leaves.len() > 1 {
             let k: usize = __pow2(leaves.len() as u32 - 1);
             let (this, that): _ = leaves.split_at(k);
 
             if index < k {
-                __generate::<D, L>(digest, path, this, index);
-                path.push(Node::R(compute_merkle_root::<D, L>(that)));
+                __generate::<D>(digest, path, this, index);
+                path.push(Node::R(compute_merkle_root::<D>(that)));
             } else {
-                __generate::<D, L>(digest, path, that, index - k);
-                path.push(Node::L(compute_merkle_root::<D, L>(this)));
+                __generate::<D>(digest, path, that, index - k);
+                path.push(Node::L(compute_merkle_root::<D>(this)));
             }
         }
     }
@@ -156,8 +157,9 @@ fn __log2c(value: u32) -> u32 {
 #[cfg(test)]
 mod tests {
     use crypto::hashes::blake2b::Blake2b256;
+    use digest::Output;
 
-    use crate::{proof::Proof, MerkleTree};
+    use crate::{digest_ext::DigestExt, proof::Proof, MerkleTree};
 
     #[derive(Debug, Clone)]
     pub struct TestElement(Vec<u8>);
@@ -182,11 +184,22 @@ mod tests {
             gen_test_elem(),
         ];
 
-        let tree: MerkleTree<_> = MerkleTree::from(Vec::from(leaves.clone()));
+        let mut digest = Blake2b256::new();
+        let hashed_leaves: Vec<Output<Blake2b256>> = leaves
+            .iter()
+            .map(|bytes| digest.hash_leaf(bytes.as_ref()))
+            .collect::<Vec<Output<Blake2b256>>>();
 
-        let root: Vec<u8> = tree.root::<Blake2b256>();
+        let tree: MerkleTree<Blake2b256> = MerkleTree::from(hashed_leaves.clone());
 
-        let proof: Proof<_> = tree.generate_proof::<Blake2b256>(2).unwrap();
+        let root: Vec<u8> = tree.root();
+
+        let proof: Proof<_> = tree.generate_proof(2).unwrap();
+
+        assert!(!proof.verify_hash(root.as_slice(), hashed_leaves[0]));
+        assert!(!proof.verify_hash(root.as_slice(), hashed_leaves[1]));
+        assert!(proof.verify_hash(root.as_slice(), hashed_leaves[2]));
+        assert!(!proof.verify_hash(root.as_slice(), hashed_leaves[3]));
 
         assert!(!proof.verify(root.as_slice(), &leaves[0]));
         assert!(!proof.verify(root.as_slice(), &leaves[1]));

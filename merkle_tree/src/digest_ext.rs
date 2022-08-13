@@ -25,7 +25,7 @@ pub trait DigestExt: Sized + Digest + Reset + FixedOutputReset {
         Digest::reset(self);
         Digest::update(self, PREFIX_LEAF);
         Digest::update(self, data);
-        self.finalize_reset().into()
+        self.finalize_reset()
     }
 
     /// Computes the parent [`struct@Hash`] of two Merkle tree nodes.
@@ -34,14 +34,14 @@ pub trait DigestExt: Sized + Digest + Reset + FixedOutputReset {
         Digest::update(self, PREFIX_NODE);
         Digest::update(self, lhs.as_slice());
         Digest::update(self, rhs.as_slice());
-        self.finalize_reset().into()
+        self.finalize_reset()
     }
 
     /// Computes the [`struct@Hash`] of an empty Merkle tree.
     fn hash_empty(&mut self) -> Output<Self> {
         Digest::reset(self);
         Digest::update(self, &[]);
-        self.finalize_reset().into()
+        self.finalize_reset()
     }
 }
 
