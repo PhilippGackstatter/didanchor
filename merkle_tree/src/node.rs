@@ -4,6 +4,12 @@
 use std::fmt::Formatter;
 
 use digest::Output;
+use packable::{
+    error::{UnpackError, UnpackErrorExt},
+    packer::Packer,
+    unpacker::Unpacker,
+    Packable,
+};
 
 use crate::digest_ext::DigestExt;
 
@@ -30,6 +36,55 @@ impl<D: DigestExt> std::fmt::Debug for Node<D> {
         match self {
             Self::L(hash) => f.write_fmt(format_args!("L({:x?})", hash)),
             Self::R(hash) => f.write_fmt(format_args!("R({:x?})", hash)),
+        }
+    }
+}
+
+impl<D: DigestExt + 'static> Packable for Node<D> {
+    type UnpackError = anyhow::Error;
+
+    fn pack<P: Packer>(&self, packer: &mut P) -> Result<(), P::Error> {
+        match self {
+            Node::L(left) => {
+                0u8.pack(packer)?;
+                packer.pack_bytes(left.as_slice())
+            }
+            Node::R(right) => {
+                1u8.pack(packer)?;
+                packer.pack_bytes(right.as_slice())
+            }
+        }
+    }
+
+    fn unpack<U: Unpacker, const VERIFY: bool>(
+        unpacker: &mut U,
+    ) -> Result<Self, UnpackError<Self::UnpackError, U::Error>> {
+        let tag: u8 = u8::unpack::<_, VERIFY>(unpacker).coerce()?;
+
+        if tag > 1 {
+            return Err(UnpackError::Packable(anyhow::anyhow!(tag)));
+        }
+
+        let len: usize = unpacker.read_bytes().ok_or_else(|| {
+            UnpackError::Packable(anyhow::anyhow!(
+                "TODO: When does this return None, exactly?"
+            ))
+        })?;
+
+        if len != D::OUTPUT_SIZE {
+            return Err(UnpackError::Packable(anyhow::anyhow!("unexpected size")));
+        }
+
+        let mut bytes: Vec<u8> = Vec::with_capacity(len);
+        unpacker.unpack_bytes(&mut bytes)?;
+
+        let output: Output<D> = Output::<D>::from_exact_iter(bytes.into_iter())
+            .expect("the size should be correct as we just checked");
+
+        if tag == 0u8 {
+            Ok(Node::L(output))
+        } else {
+            Ok(Node::R(output))
         }
     }
 }

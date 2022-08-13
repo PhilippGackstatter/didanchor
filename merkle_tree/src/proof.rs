@@ -4,6 +4,8 @@
 use std::fmt::Formatter;
 
 use digest::Output;
+use packable::error::UnpackErrorExt;
+use packable::Packable;
 
 use crate::digest_ext::DigestExt;
 use crate::node::Node;
@@ -68,6 +70,34 @@ impl<D: DigestExt> Proof<D> {
         self.nodes
             .iter()
             .fold(target, |acc, item| item.hash_with(digest, &acc))
+    }
+}
+
+impl<D: DigestExt + 'static> Packable for Proof<D> {
+    type UnpackError = anyhow::Error;
+
+    fn pack<P: packable::packer::Packer>(&self, packer: &mut P) -> Result<(), P::Error> {
+        let len: u64 = self.nodes.len() as u64;
+        len.pack(packer)?;
+
+        for node in self.nodes.iter() {
+            node.pack(packer)?;
+        }
+
+        Ok(())
+    }
+
+    fn unpack<U: packable::unpacker::Unpacker, const VERIFY: bool>(
+        unpacker: &mut U,
+    ) -> Result<Self, packable::error::UnpackError<Self::UnpackError, U::Error>> {
+        let len: u64 = u64::unpack::<_, VERIFY>(unpacker).coerce()?;
+        let mut nodes: Vec<Node<D>> = Vec::with_capacity(len as usize);
+
+        for _ in 0..len {
+            nodes.push(<Node<D>>::unpack::<_, VERIFY>(unpacker)?);
+        }
+
+        Ok(Proof::new(nodes.into_boxed_slice()))
     }
 }
 

@@ -15,6 +15,10 @@ iota-crypto = { version = "0.13.0", features = [
   "sha",
 ], default-features = false }
 merkle_tree = { path = "../merkle_tree" }
+ipfs-api-backend-hyper = { version = "0.5", features = ["with-hyper-rustls"] }
+serde = "1.0"
+packable = "0.5.0"
+futures = "0.3"
 
 [dependencies.iota-client]
 git = "https://github.com/iotaledger/iota.rs"
