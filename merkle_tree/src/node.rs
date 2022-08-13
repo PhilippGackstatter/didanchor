@@ -65,22 +65,15 @@ impl<D: DigestExt + 'static> Packable for Node<D> {
             return Err(UnpackError::Packable(anyhow::anyhow!(tag)));
         }
 
-        let len: usize = unpacker.read_bytes().ok_or_else(|| {
-            UnpackError::Packable(anyhow::anyhow!(
-                "TODO: When does this return None, exactly?"
-            ))
-        })?;
+        unpacker.ensure_bytes(D::OUTPUT_SIZE)?;
 
-        if len != D::OUTPUT_SIZE {
-            return Err(UnpackError::Packable(anyhow::anyhow!("unexpected size")));
-        }
-
-        let mut bytes: Vec<u8> = Vec::with_capacity(len);
+        let mut bytes: Vec<u8> = vec![0; D::OUTPUT_SIZE];
         unpacker.unpack_bytes(&mut bytes)?;
 
         let output: Output<D> = Output::<D>::from_exact_iter(bytes.into_iter())
             .expect("the size should be correct as we just checked");
 
+        let tag = 0;
         if tag == 0u8 {
             Ok(Node::L(output))
         } else {
@@ -93,6 +86,7 @@ impl<D: DigestExt + 'static> Packable for Node<D> {
 mod tests {
     use crypto::hashes::blake2b::Blake2b256;
     use digest::Output;
+    use packable::{unpacker::SliceUnpacker, Packable, PackableExt};
 
     use crate::{digest_ext::DigestExt, node::Node};
 
@@ -120,5 +114,35 @@ mod tests {
             Node::R(h2).hash_with(&mut digest, &h1),
             digest.hash_node(&h1, &h2)
         );
+    }
+
+    #[test]
+    fn test_node_packing_roundtrip() {
+        let node = Node::<Blake2b256>::L(
+            Output::<Blake2b256>::from_exact_iter(
+                [
+                    0, 1, 2, 3, 4, 5, 6, 7, 0, 1, 2, 3, 4, 5, 6, 7, 0, 1, 2, 3, 4, 5, 6, 7, 0, 1,
+                    2, 3, 4, 5, 6, 7,
+                ]
+                .into_iter(),
+            )
+            .unwrap(),
+        );
+
+        let vec = node.pack_to_vec();
+
+        let mut unpacker = SliceUnpacker::new(&vec);
+
+        let node2: Node<Blake2b256> =
+            <Node<Blake2b256>>::unpack::<_, false>(&mut unpacker).unwrap();
+
+        let eq = match (node, node2) {
+            (Node::L(l), Node::L(l2)) => l == l2,
+            (Node::L(_), Node::R(_)) => false,
+            (Node::R(_), Node::L(_)) => false,
+            (Node::R(r), Node::R(r2)) => r == r2,
+        };
+
+        assert!(eq);
     }
 }

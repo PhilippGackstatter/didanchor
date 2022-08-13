@@ -1,12 +1,17 @@
 use std::{collections::HashMap, io::Cursor};
 
 use crypto::hashes::blake2b::Blake2b256;
-use futures::StreamExt;
+use futures::TryStreamExt;
+use http::uri::Scheme;
 use identity_core::convert::{FromJson, ToJson};
 use identity_iota_core::did::IotaDID;
-use ipfs_api_backend_hyper::{IpfsApi, IpfsClient};
+use ipfs_api_backend_hyper::{IpfsApi, IpfsClient, TryFromUri};
 use merkle_tree::Proof;
-use packable::{error::UnpackError, unpacker::SliceUnpacker, Packable, PackableExt};
+use packable::{
+    error::{UnpackError, UnpackErrorExt},
+    unpacker::SliceUnpacker,
+    Packable, PackableExt,
+};
 
 use crate::ChainOfCustody;
 
@@ -23,6 +28,14 @@ impl ChainStorage {
         }
     }
 
+    pub fn new_with_host(hostname: &str, port: u16) -> anyhow::Result<Self> {
+        let ipfs = IpfsClient::from_host_and_port(Scheme::HTTP, hostname, port).unwrap();
+
+        Ok(Self { ipfs })
+    }
+
+    // TODO: This needs to be a cluster operation rather than an individual node operation.
+    /// Adds and pins the given [`VerifiableChainOfCustody`].
     pub async fn add(
         &self,
         verif_chain_of_custody: &VerifiableChainOfCustody,
@@ -41,10 +54,18 @@ impl ChainStorage {
     pub async fn get(&self, did: &IotaDID) -> anyhow::Result<Option<VerifiableChainOfCustody>> {
         let index = self.get_index().await?;
 
-        let cid = if let Some(cid) = index.get(did) {
-            cid
-        } else {
-            return Ok(None);
+        let cid = match index {
+            Some(ref index) => {
+                let cid = if let Some(cid) = index.get(did) {
+                    cid
+                } else {
+                    return Ok(None);
+                };
+                cid
+            }
+            None => {
+                return Ok(None);
+            }
         };
 
         let bytes = self.get_bytes(cid).await?;
@@ -56,14 +77,16 @@ impl ChainStorage {
         Ok(Some(coc))
     }
 
-    pub async fn get_index(&self) -> anyhow::Result<DIDIndex> {
+    pub async fn get_index(&self) -> anyhow::Result<Option<DIDIndex>> {
         let cid: String = self.ipfs.name_resolve(None, false, false).await?.path;
-
-        println!("resolved self name to {cid}");
 
         let json = self.get_bytes(&cid).await?;
 
-        Ok(DIDIndex::from_json_slice(&json)?)
+        if json.is_empty() {
+            Ok(None)
+        } else {
+            Ok(Some(DIDIndex::from_json_slice(&json)?))
+        }
     }
 
     pub async fn publish_index(&self, index: DIDIndex) -> anyhow::Result<()> {
@@ -72,25 +95,31 @@ impl ChainStorage {
 
         let cid = &self.ipfs.add(cursor).await?.hash;
 
-        println!("published index at {cid}");
-
         self.ipfs.name_publish(cid, false, None, None, None).await?;
 
         Ok(())
     }
 
     async fn get_bytes(&self, cid: &str) -> anyhow::Result<Vec<u8>> {
-        let mut stream = self.ipfs.get(cid.as_ref());
+        Ok(self
+            .ipfs
+            .cat(cid)
+            .map_ok(|chunk| chunk.to_vec())
+            .try_concat()
+            .await?)
+    }
 
-        let mut bytes = Vec::new();
-
-        // TODO: What does get even return precisely?
-        while let Some(value) = stream.next().await {
-            let value = value?;
-            bytes.extend_from_slice(&value);
-        }
-
-        Ok(bytes)
+    /// Returns the IPNS name on which the index is stored.
+    pub async fn index_name(&self) -> anyhow::Result<String> {
+        Ok(self
+            .ipfs
+            .key_list()
+            .await?
+            .keys
+            .into_iter()
+            .next()
+            .unwrap()
+            .id)
     }
 }
 
@@ -122,6 +151,9 @@ impl Packable for VerifiableChainOfCustody {
             .to_json_vec()
             .expect("TODO: unclear how to use P::Error");
 
+        let len: u64 = bytes.len() as u64;
+
+        len.pack(packer)?;
         packer.pack_bytes(bytes.as_slice())?;
 
         Ok(())
@@ -131,7 +163,10 @@ impl Packable for VerifiableChainOfCustody {
         unpacker: &mut U,
     ) -> Result<Self, packable::error::UnpackError<Self::UnpackError, U::Error>> {
         let proof = <Proof<Blake2b256>>::unpack::<_, VERIFY>(unpacker)?;
-        let mut bytes = Vec::new();
+
+        let len: usize = u64::unpack::<_, VERIFY>(unpacker).coerce()? as usize;
+
+        let mut bytes = vec![0; len];
         unpacker.unpack_bytes(&mut bytes)?;
         let chain_of_custody = ChainOfCustody::from_json_slice(&bytes)
             .map_err(|err| UnpackError::Packable(anyhow::anyhow!(err)))?;

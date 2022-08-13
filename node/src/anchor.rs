@@ -7,13 +7,23 @@ use merkle_tree::Proof;
 
 use crate::{ChainOfCustody, ChainStorage, DIDIndex, MerkleDIDs, VerifiableChainOfCustody};
 
-pub struct Node {
+pub struct Anchor {
     storage: ChainStorage,
     merkle: MerkleDIDs,
     uncommitted_chains: HashMap<IotaDID, ChainOfCustody>,
 }
 
-impl Node {
+impl Anchor {
+    pub fn new(hostname: &str, port: u16) -> anyhow::Result<Self> {
+        let storage = ChainStorage::new_with_host(hostname, port)?;
+
+        Ok(Self {
+            storage,
+            merkle: MerkleDIDs::new(),
+            uncommitted_chains: HashMap::new(),
+        })
+    }
+
     pub async fn update_document(&mut self, document: ResolvedIotaDocument) -> anyhow::Result<()> {
         let did = document.document.id().to_owned();
         // TODO: Check uncommitted_chains first, only then go to storage.
@@ -35,7 +45,7 @@ impl Node {
 
         std::mem::swap(&mut self.uncommitted_chains, &mut uncommitted_chains);
 
-        let mut index: DIDIndex = self.storage.get_index().await?;
+        let mut index: DIDIndex = self.storage.get_index().await?.unwrap_or_default();
 
         for (did, coc) in uncommitted_chains.into_iter() {
             let proof: Proof<_> = self
@@ -50,6 +60,8 @@ impl Node {
             // Update the storage index.
             index.insert(did, content_id);
         }
+
+        self.storage.publish_index(index).await?;
 
         // TODO: Store merkle root in alias output.
 
