@@ -1,0 +1,29 @@
+[package]
+name = "examples"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+anyhow = "1"
+rand = "0.8.5"
+tokio = { version = "1", features = ["fs"] }
+pretty_env_logger = "0.4"
+identity_iota_core = "0.6.1"
+identity_core = "0.6.1"
+identity_did = "0.6.1"
+identity_iota_client = "0.6.1"
+didanchor = { path = "../didanchor" }
+
+[dependencies.iota-client]
+git = "https://github.com/iotaledger/iota.rs"
+rev = "3cfeabd82f60c47305159af114b404291041af7d" # develop branch, 2022-08-10
+features = ["tls"]
+default-features = false
+
+[[example]]
+path = "src/anchor.rs"
+name = "anchor"
+
+[[example]]
+path = "src/mnemonic.rs"
+name = "init"

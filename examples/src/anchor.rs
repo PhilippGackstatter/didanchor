@@ -13,7 +13,7 @@ use identity_iota_core::{
     document::{IotaDocument, IotaService, IotaVerificationMethod},
     tangle::MessageId,
 };
-use node::Anchor;
+use didanchor::Anchor;
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
