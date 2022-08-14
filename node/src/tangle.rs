@@ -10,6 +10,7 @@ use iota_client::{
             AliasId, AliasOutput, AliasOutputBuilder, Output, OutputId, RentStructure,
             UnlockCondition,
         },
+        payload::{transaction::TransactionEssence, Payload},
         Block,
     },
     secret::{mnemonic::MnemonicSecretManager, SecretManager},
@@ -48,7 +49,9 @@ impl AnchorAlias {
         Ok(anchor_alias)
     }
 
-    pub async fn publish_output(&self, content: AliasContent) -> anyhow::Result<()> {
+    pub async fn publish_output(&mut self, content: AliasContent) -> anyhow::Result<AliasId> {
+        log::debug!("publishing new Alias Output");
+
         let content_vec = content.to_json_vec()?;
 
         let rent_structure = self.client.get_rent_structure().await?;
@@ -74,7 +77,16 @@ impl AnchorAlias {
             .retry_until_included(&block.id(), None, None)
             .await?;
 
-        Ok(())
+        let alias_id = Self::alias_ids_from_block(&block)?
+            .into_iter()
+            .next()
+            .expect("there should be exactly one alias id");
+
+        log::debug!("published output with id {alias_id}");
+
+        self.id = Some(alias_id);
+
+        Ok(alias_id)
     }
 
     async fn new_output(
@@ -140,11 +152,44 @@ impl AnchorAlias {
             unreachable!("we requested an alias output. (TODO: turn into error later, though.)");
         }
     }
+
+    /// Returns all DID documents of the Alias Outputs contained in the payload's transaction, if any.
+    fn alias_ids_from_block(block: &Block) -> anyhow::Result<Vec<AliasId>> {
+        let mut documents = Vec::new();
+
+        if let Some(Payload::Transaction(tx_payload)) = block.payload() {
+            let TransactionEssence::Regular(regular) = tx_payload.essence();
+
+            for (index, output) in regular.outputs().iter().enumerate() {
+                if let Output::Alias(alias_output) = output {
+                    let alias_id = if alias_output.alias_id().is_null() {
+                        AliasId::from(OutputId::new(tx_payload.id(), index.try_into()?)?)
+                    } else {
+                        alias_output.alias_id().to_owned()
+                    };
+
+                    documents.push(alias_id);
+                }
+            }
+        }
+
+        Ok(documents)
+    }
 }
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct AliasContent {
     index_cid: String,
-    node_addrs: Vec<String>,
+    ipfs_node_addrs: Vec<String>,
     merkle_root: Vec<u8>,
+}
+
+impl AliasContent {
+    pub fn new(index_cid: String, ipfs_node_addrs: Vec<String>, merkle_root: Vec<u8>) -> Self {
+        Self {
+            index_cid,
+            ipfs_node_addrs,
+            merkle_root,
+        }
+    }
 }

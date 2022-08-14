@@ -6,7 +6,7 @@ use identity_iota_core::did::IotaDID;
 use merkle_tree::Proof;
 
 use crate::{
-    AnchorAlias, AnchorConfig, ChainOfCustody, ChainStorage, DIDIndex, MerkleDIDs,
+    AliasContent, AnchorAlias, AnchorConfig, ChainOfCustody, ChainStorage, DIDIndex, MerkleDIDs,
     VerifiableChainOfCustody,
 };
 
@@ -31,7 +31,7 @@ impl Anchor {
             DIDIndex::new()
         };
 
-        let anchor_alias = AnchorAlias::new("".to_owned())?;
+        let anchor_alias = AnchorAlias::new(config.mnemonic.clone())?;
 
         Ok(Self {
             storage,
@@ -90,11 +90,22 @@ impl Anchor {
         }
 
         let index_cid = self.storage.publish_index(&self.index).await?;
-        self.config.index_cid = Some(index_cid);
+        self.config.index_cid = Some(index_cid.clone());
+
+        // Update the Alias Output.
+
+        let content = AliasContent::new(
+            index_cid,
+            self.config.ipfs_node_addrs.clone(),
+            self.merkle.merkle_root(),
+        );
+
+        let alias_id = self.anchor_alias.publish_output(content).await?;
+
+        // TODO: Find better place for config, share it via Arc?
+        self.config.alias_id = alias_id;
 
         self.config.write_default_location().await?;
-
-        // TODO: Store merkle root in alias output.
 
         Ok(())
     }

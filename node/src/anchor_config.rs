@@ -1,18 +1,18 @@
-use std::{io::ErrorKind, path::Path};
+use std::path::Path;
 
 use identity_core::convert::{FromJson, ToJson};
+use iota_client::block::output::AliasId;
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct AnchorConfig {
     pub index_cid: Option<String>,
+    pub alias_id: AliasId,
+    pub mnemonic: String,
+    pub ipfs_node_addrs: Vec<String>,
 }
 
 impl AnchorConfig {
     const DEFAULT_PATH: &'static str = "./anchor_config.json";
-
-    pub fn new() -> Self {
-        Self { index_cid: None }
-    }
 
     pub async fn read(path: impl AsRef<Path>) -> anyhow::Result<Self> {
         log::debug!("reading config from {}", path.as_ref().display());
@@ -21,13 +21,7 @@ impl AnchorConfig {
             Ok(content) => Ok(AnchorConfig::from_json(std::str::from_utf8(
                 content.as_slice(),
             )?)?),
-            Err(err) => {
-                if err.kind() == ErrorKind::NotFound {
-                    Ok(AnchorConfig::new())
-                } else {
-                    Err(anyhow::anyhow!(err))
-                }
-            }
+            Err(err) => Err(anyhow::anyhow!(err)),
         }
     }
 
@@ -43,11 +37,5 @@ impl AnchorConfig {
 
     pub async fn write_default_location(&self) -> anyhow::Result<()> {
         self.write(Self::DEFAULT_PATH).await
-    }
-}
-
-impl Default for AnchorConfig {
-    fn default() -> Self {
-        Self::new()
     }
 }
