@@ -31,7 +31,8 @@ impl Anchor {
             DIDIndex::new()
         };
 
-        let anchor_alias = AnchorAlias::new(config.mnemonic.clone())?;
+        let mut anchor_alias = AnchorAlias::new(config.mnemonic.clone())?;
+        anchor_alias.id = Some(config.alias_id);
 
         Ok(Self {
             storage,

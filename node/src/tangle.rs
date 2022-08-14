@@ -17,12 +17,12 @@ use iota_client::{
     Client,
 };
 
-static ENDPOINT: &str = "https://api.alphanet.iotaledger.net";
+pub static IOTA_NETWORK_ENDPOINT: &str = "https://api.alphanet.iotaledger.net";
 // static FAUCET_URL: &str = "https://faucet.alphanet.iotaledger.net/api/enqueue";
 
 pub struct AnchorAlias {
     client: Client,
-    id: Option<AliasId>,
+    pub id: Option<AliasId>,
     // insecure.
     secret_manager: SecretManager,
 }
@@ -30,7 +30,7 @@ pub struct AnchorAlias {
 impl AnchorAlias {
     pub fn new(mnemonic: String) -> anyhow::Result<Self> {
         let client: Client = Client::builder()
-            .with_primary_node(ENDPOINT, None)?
+            .with_primary_node(IOTA_NETWORK_ENDPOINT, None)?
             .finish()?;
 
         let secret_manager: SecretManager =
@@ -179,13 +179,17 @@ impl AnchorAlias {
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct AliasContent {
-    index_cid: String,
-    ipfs_node_addrs: Vec<String>,
-    merkle_root: Vec<u8>,
+    pub index_cid: String,
+    pub ipfs_node_addrs: Vec<(String, String)>,
+    pub merkle_root: Vec<u8>,
 }
 
 impl AliasContent {
-    pub fn new(index_cid: String, ipfs_node_addrs: Vec<String>, merkle_root: Vec<u8>) -> Self {
+    pub fn new(
+        index_cid: String,
+        ipfs_node_addrs: Vec<(String, String)>,
+        merkle_root: Vec<u8>,
+    ) -> Self {
         Self {
             index_cid,
             ipfs_node_addrs,

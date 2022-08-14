@@ -73,7 +73,6 @@ impl<D: DigestExt + 'static> Packable for Node<D> {
         let output: Output<D> = Output::<D>::from_exact_iter(bytes.into_iter())
             .expect("the size should be correct as we just checked");
 
-        let tag = 0;
         if tag == 0u8 {
             Ok(Node::L(output))
         } else {
@@ -116,33 +115,37 @@ mod tests {
         );
     }
 
-    #[test]
-    fn test_node_packing_roundtrip() {
-        let node = Node::<Blake2b256>::L(
-            Output::<Blake2b256>::from_exact_iter(
-                [
-                    0, 1, 2, 3, 4, 5, 6, 7, 0, 1, 2, 3, 4, 5, 6, 7, 0, 1, 2, 3, 4, 5, 6, 7, 0, 1,
-                    2, 3, 4, 5, 6, 7,
-                ]
-                .into_iter(),
-            )
-            .unwrap(),
-        );
-
-        let vec = node.pack_to_vec();
-
-        let mut unpacker = SliceUnpacker::new(&vec);
-
-        let node2: Node<Blake2b256> =
-            <Node<Blake2b256>>::unpack::<_, false>(&mut unpacker).unwrap();
-
-        let eq = match (node, node2) {
+    fn equal<D: DigestExt>(node: Node<D>, other: Node<D>) -> bool {
+        match (node, other) {
             (Node::L(l), Node::L(l2)) => l == l2,
             (Node::L(_), Node::R(_)) => false,
             (Node::R(_), Node::L(_)) => false,
             (Node::R(r), Node::R(r2)) => r == r2,
-        };
+        }
+    }
 
-        assert!(eq);
+    #[test]
+    fn test_node_packing_roundtrip() {
+        let random1: [u8; 32] = rand::random();
+        let random2: [u8; 32] = rand::random();
+        let node1 = Node::<Blake2b256>::L(
+            Output::<Blake2b256>::from_exact_iter(random1.into_iter()).unwrap(),
+        );
+        let node2 = Node::<Blake2b256>::R(
+            Output::<Blake2b256>::from_exact_iter(random2.into_iter()).unwrap(),
+        );
+
+        let vec1 = node1.pack_to_vec();
+        let mut unpacker1 = SliceUnpacker::new(&vec1);
+        let node1_unpacked: Node<Blake2b256> =
+            <Node<Blake2b256>>::unpack::<_, false>(&mut unpacker1).unwrap();
+
+        let vec2 = node2.pack_to_vec();
+        let mut unpacker2 = SliceUnpacker::new(&vec2);
+        let node2_unpacked: Node<Blake2b256> =
+            <Node<Blake2b256>>::unpack::<_, false>(&mut unpacker2).unwrap();
+
+        assert!(equal(node1, node1_unpacked));
+        assert!(equal(node2, node2_unpacked));
     }
 }

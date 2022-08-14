@@ -25,6 +25,7 @@ http = "0.2"
 ipfs_cluster = { path = "../ipfs_cluster" }
 log = "0.4"
 pretty_env_logger = "0.4"
+prefix-hex = "0.4"
 
 [dependencies.iota-client]
 git = "https://github.com/iotaledger/iota.rs"

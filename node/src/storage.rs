@@ -36,7 +36,7 @@ impl ChainStorage {
         ipfs_port: u16,
         ipfs_cluster_hostname: &str,
     ) -> anyhow::Result<Self> {
-        let ipfs = IpfsClient::from_host_and_port(Scheme::HTTP, ipfs_hostname, ipfs_port).unwrap();
+        let ipfs = IpfsClient::from_host_and_port(Scheme::HTTP, ipfs_hostname, ipfs_port)?;
         let ipfs_cluster = IpfsClusterClient::new_with_host(ipfs_cluster_hostname);
 
         Ok(Self { ipfs, ipfs_cluster })

@@ -31,7 +31,7 @@ async fn main() -> anyhow::Result<()> {
     node.update_document(doc3).await?;
     node.update_document(doc4).await?;
 
-    node.commit_changes().await?;
+    // node.commit_changes().await?;
 
     let doc1 = update_document(&keypair1, doc1, |doc| {
         doc.insert_service(service(
@@ -52,6 +52,8 @@ async fn main() -> anyhow::Result<()> {
     node.update_document(doc1.clone()).await?;
 
     node.commit_changes().await?;
+
+    println!("updated {} several times", doc1.document.id());
 
     Ok(())
 }

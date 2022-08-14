@@ -8,7 +8,7 @@ pub struct AnchorConfig {
     pub index_cid: Option<String>,
     pub alias_id: AliasId,
     pub mnemonic: String,
-    pub ipfs_node_addrs: Vec<String>,
+    pub ipfs_node_addrs: Vec<(String, String)>,
 }
 
 impl AnchorConfig {
