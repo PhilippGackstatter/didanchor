@@ -60,21 +60,15 @@ impl ChainStorage {
         Ok(())
     }
 
-    pub async fn get(&self, did: &IotaDID) -> anyhow::Result<Option<VerifiableChainOfCustody>> {
-        let index = self.get_index().await?;
-
-        let cid = match index {
-            Some(ref index) => {
-                let cid = if let Some(cid) = index.get(did) {
-                    cid
-                } else {
-                    return Ok(None);
-                };
-                cid
-            }
-            None => {
-                return Ok(None);
-            }
+    pub async fn get(
+        &self,
+        did: &IotaDID,
+        index: &DIDIndex,
+    ) -> anyhow::Result<Option<VerifiableChainOfCustody>> {
+        let cid = if let Some(cid) = index.get(did) {
+            cid
+        } else {
+            return Ok(None);
         };
 
         let bytes = self.get_bytes(cid).await?;
@@ -98,7 +92,7 @@ impl ChainStorage {
         }
     }
 
-    pub async fn publish_index(&self, index: DIDIndex) -> anyhow::Result<()> {
+    pub async fn publish_index(&self, index: &DIDIndex) -> anyhow::Result<()> {
         let json: Vec<u8> = index.to_json_vec()?;
         let cursor = Cursor::new(json);
 

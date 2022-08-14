@@ -74,20 +74,3 @@ impl Default for IpfsClusterClient {
         Self::new()
     }
 }
-
-#[cfg(test)]
-mod tests {
-    use crate::IpfsClusterClient;
-
-    #[tokio::test]
-    async fn test_add() {
-        let client = IpfsClusterClient::new();
-
-        let resp = client
-            .add(b"this is a tokio test\n".to_vec())
-            .await
-            .unwrap();
-
-        println!("{resp:?}");
-    }
-}

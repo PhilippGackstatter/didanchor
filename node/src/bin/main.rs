@@ -17,7 +17,7 @@ use node::Anchor;
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
-    let mut node = Anchor::new();
+    let mut node = Anchor::new().await?;
 
     let (keypair1, doc1) = gen_document();
     let (keypair2, doc2) = gen_document();

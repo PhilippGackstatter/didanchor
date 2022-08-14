@@ -11,17 +11,21 @@ pub struct Anchor {
     storage: ChainStorage,
     merkle: MerkleDIDs,
     uncommitted_chains: HashMap<IotaDID, ChainOfCustody>,
+    index: DIDIndex,
 }
 
 impl Anchor {
-    pub fn new() -> Self {
+    pub async fn new() -> anyhow::Result<Self> {
         let storage = ChainStorage::new();
 
-        Self {
+        let index = storage.get_index().await?.unwrap_or_default();
+
+        Ok(Self {
             storage,
             merkle: MerkleDIDs::new(),
             uncommitted_chains: HashMap::new(),
-        }
+            index,
+        })
     }
 
     pub async fn update_document(&mut self, document: ResolvedIotaDocument) -> anyhow::Result<()> {
@@ -29,7 +33,7 @@ impl Anchor {
         // TODO: Check uncommitted_chains first, only then go to storage.
         let chain_of_custody: Option<ChainOfCustody> = self
             .storage
-            .get(&did)
+            .get(&did, &self.index)
             .await?
             .map(|vcoc| vcoc.chain_of_custody);
         let chain_of_custody: ChainOfCustody =
@@ -45,8 +49,6 @@ impl Anchor {
 
         std::mem::swap(&mut self.uncommitted_chains, &mut uncommitted_chains);
 
-        let mut index: DIDIndex = self.storage.get_index().await?.unwrap_or_default();
-
         for (did, coc) in uncommitted_chains.into_iter() {
             let proof: Proof<_> = self
                 .merkle
@@ -57,7 +59,7 @@ impl Anchor {
             let vcoc = VerifiableChainOfCustody::new(proof, coc);
             let content_id: String = self.storage.add(&vcoc).await?;
 
-            if let Some(cid) = index.get(&did) {
+            if let Some(cid) = self.index.get(&did) {
                 // Remove the previous pin as we no longer need it.
                 // In a production deployment, this would probably have to be done later
                 // to ensure availability within a certain grace period.
@@ -65,19 +67,13 @@ impl Anchor {
             }
 
             // Update the storage index.
-            index.insert(did, content_id);
+            self.index.insert(did, content_id);
         }
 
-        self.storage.publish_index(index).await?;
+        self.storage.publish_index(&self.index).await?;
 
         // TODO: Store merkle root in alias output.
 
         Ok(())
-    }
-}
-
-impl Default for Anchor {
-    fn default() -> Self {
-        Self::new()
     }
 }
