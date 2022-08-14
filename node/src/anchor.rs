@@ -6,7 +6,8 @@ use identity_iota_core::did::IotaDID;
 use merkle_tree::Proof;
 
 use crate::{
-    AnchorConfig, ChainOfCustody, ChainStorage, DIDIndex, MerkleDIDs, VerifiableChainOfCustody,
+    AnchorAlias, AnchorConfig, ChainOfCustody, ChainStorage, DIDIndex, MerkleDIDs,
+    VerifiableChainOfCustody,
 };
 
 pub struct Anchor {
@@ -15,6 +16,7 @@ pub struct Anchor {
     uncommitted_chains: HashMap<IotaDID, ChainOfCustody>,
     index: DIDIndex,
     config: AnchorConfig,
+    anchor_alias: AnchorAlias,
 }
 
 impl Anchor {
@@ -29,12 +31,15 @@ impl Anchor {
             DIDIndex::new()
         };
 
+        let anchor_alias = AnchorAlias::new("".to_owned())?;
+
         Ok(Self {
             storage,
             merkle: MerkleDIDs::new(),
             uncommitted_chains: HashMap::new(),
             index,
             config,
+            anchor_alias,
         })
     }
 

@@ -28,7 +28,6 @@ pretty_env_logger = "0.4"
 
 [dependencies.iota-client]
 git = "https://github.com/iotaledger/iota.rs"
-rev = "a582bfa882793fe21db2055c4f7878ebc531877a" # develop branch, 2022-07-27
+rev = "3cfeabd82f60c47305159af114b404291041af7d" # develop branch, 2022-08-10
 features = ["tls"]
 default-features = false
-optional = true
