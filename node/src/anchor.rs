@@ -14,14 +14,14 @@ pub struct Anchor {
 }
 
 impl Anchor {
-    pub fn new(hostname: &str, port: u16) -> anyhow::Result<Self> {
-        let storage = ChainStorage::new_with_host(hostname, port)?;
+    pub fn new() -> Self {
+        let storage = ChainStorage::new();
 
-        Ok(Self {
+        Self {
             storage,
             merkle: MerkleDIDs::new(),
             uncommitted_chains: HashMap::new(),
-        })
+        }
     }
 
     pub async fn update_document(&mut self, document: ResolvedIotaDocument) -> anyhow::Result<()> {
@@ -57,6 +57,13 @@ impl Anchor {
             let vcoc = VerifiableChainOfCustody::new(proof, coc);
             let content_id: String = self.storage.add(&vcoc).await?;
 
+            if let Some(cid) = index.get(&did) {
+                // Remove the previous pin as we no longer need it.
+                // In a production deployment, this would probably have to be done later
+                // to ensure availability within a certain grace period.
+                self.storage.unpin(cid).await?;
+            }
+
             // Update the storage index.
             index.insert(did, content_id);
         }
@@ -66,5 +73,11 @@ impl Anchor {
         // TODO: Store merkle root in alias output.
 
         Ok(())
+    }
+}
+
+impl Default for Anchor {
+    fn default() -> Self {
+        Self::new()
     }
 }

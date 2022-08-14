@@ -6,6 +6,7 @@ use http::uri::Scheme;
 use identity_core::convert::{FromJson, ToJson};
 use identity_iota_core::did::IotaDID;
 use ipfs_api_backend_hyper::{IpfsApi, IpfsClient, TryFromUri};
+use ipfs_cluster::IpfsClusterClient;
 use merkle_tree::Proof;
 use packable::{
     error::{UnpackError, UnpackErrorExt},
@@ -19,35 +20,43 @@ use crate::ChainOfCustody;
 #[derive(Clone, Default)]
 pub struct ChainStorage {
     ipfs: IpfsClient,
+    ipfs_cluster: IpfsClusterClient,
 }
 
 impl ChainStorage {
     pub fn new() -> Self {
         Self {
             ipfs: IpfsClient::default(),
+            ipfs_cluster: IpfsClusterClient::default(),
         }
     }
 
-    pub fn new_with_host(hostname: &str, port: u16) -> anyhow::Result<Self> {
-        let ipfs = IpfsClient::from_host_and_port(Scheme::HTTP, hostname, port).unwrap();
+    pub fn new_with_host(
+        ipfs_hostname: &str,
+        ipfs_port: u16,
+        ipfs_cluster_hostname: &str,
+    ) -> anyhow::Result<Self> {
+        let ipfs = IpfsClient::from_host_and_port(Scheme::HTTP, ipfs_hostname, ipfs_port).unwrap();
+        let ipfs_cluster = IpfsClusterClient::new_with_host(ipfs_cluster_hostname);
 
-        Ok(Self { ipfs })
+        Ok(Self { ipfs, ipfs_cluster })
     }
 
-    // TODO: This needs to be a cluster operation rather than an individual node operation.
     /// Adds and pins the given [`VerifiableChainOfCustody`].
     pub async fn add(
         &self,
         verif_chain_of_custody: &VerifiableChainOfCustody,
     ) -> anyhow::Result<String> {
-        let coc: Cursor<Vec<u8>> = Cursor::new(verif_chain_of_custody.pack_to_vec());
-        let hash = self.ipfs.add(coc).await?.hash;
-        Ok(hash)
+        let packed: Vec<u8> = verif_chain_of_custody.pack_to_vec();
+
+        let cid = self.ipfs_cluster.add(packed).await?.cid;
+
+        Ok(cid)
     }
 
-    // TODO: This needs to be a cluster operation rather than an individual node operation.
-    pub async fn unpin(&self, hash: &str) -> anyhow::Result<()> {
-        self.ipfs.pin_rm(hash, false).await?;
+    pub async fn unpin(&self, cid: &str) -> anyhow::Result<()> {
+        self.ipfs_cluster.unpin(cid).await?;
+
         Ok(())
     }
 

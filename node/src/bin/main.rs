@@ -17,7 +17,7 @@ use node::Anchor;
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
-    let mut node = Anchor::new("127.0.0.1", 5001)?;
+    let mut node = Anchor::new();
 
     let (keypair1, doc1) = gen_document();
     let (keypair2, doc2) = gen_document();
