@@ -7,8 +7,8 @@ use iota_client::block::output::AliasId;
 use merkle_tree::Proof;
 
 use crate::{
-    AliasContent, AnchorAlias, AnchorConfig, ChainOfCustody, ChainStorage, DIDIndex, MerkleDIDs,
-    VerifiableChainOfCustody,
+    resolve_alias_content, AliasContent, AnchorConfig, AnchorOutput, ChainOfCustody, ChainStorage,
+    DIDIndex, MerkleDIDs, VerifiableChainOfCustody,
 };
 
 pub struct Anchor {
@@ -17,23 +17,32 @@ pub struct Anchor {
     uncommitted_chains: HashMap<IotaDID, ChainOfCustody>,
     index: DIDIndex,
     config: AnchorConfig,
-    anchor_alias: AnchorAlias,
+    anchor_output: AnchorOutput,
+    index_cid: Option<String>,
 }
 
 impl Anchor {
     pub async fn new() -> anyhow::Result<Self> {
         let config = AnchorConfig::read_default_location().await?;
 
+        let anchor_output: AnchorOutput =
+            AnchorOutput::new(config.mnemonic.clone(), config.alias_id)?;
+
+        // Retrieve the current alias output to obtain the latest index cid.
+        // We could store this locally, but this way seems safer overall.
+        let content: Option<AliasContent> =
+            resolve_alias_content(&anchor_output.client, config.alias_id).await?;
+
         let storage = ChainStorage::new(config.ipfs_gateway_addrs.clone());
 
-        let index: DIDIndex = if let Some(ref index_cid) = config.index_cid {
-            storage.get_index(index_cid).await?
+        let (index, index_cid): (DIDIndex, Option<String>) = if let Some(content) = content {
+            (
+                storage.get_index(&content.index_cid).await?,
+                Some(content.index_cid),
+            )
         } else {
-            DIDIndex::new()
+            (DIDIndex::new(), None)
         };
-
-        let mut anchor_alias = AnchorAlias::new(config.mnemonic.clone())?;
-        anchor_alias.id = Some(config.alias_id);
 
         Ok(Self {
             storage,
@@ -41,7 +50,8 @@ impl Anchor {
             uncommitted_chains: HashMap::new(),
             index,
             config,
-            anchor_alias,
+            anchor_output,
+            index_cid,
         })
     }
 
@@ -91,10 +101,12 @@ impl Anchor {
             self.index.insert(did, content_id);
         }
 
-        // TODO: Unpin old index.
-
-        let index_cid = self.storage.publish_index(&self.index).await?;
-        self.config.index_cid = Some(index_cid.clone());
+        // Unpin old index and upload and set new one.
+        if let Some(ref old_index_cid) = self.index_cid {
+            self.storage.unpin(old_index_cid).await?;
+        }
+        let index_cid: String = self.storage.publish_index(&self.index).await?;
+        self.index_cid = Some(index_cid.clone());
 
         // Update the Alias Output.
 
@@ -104,7 +116,7 @@ impl Anchor {
             self.merkle.merkle_root(),
         );
 
-        let alias_id = self.anchor_alias.publish_output(content).await?;
+        let alias_id = self.anchor_output.publish_output(content).await?;
 
         // TODO: Find better place for config, share it via Arc?
         self.config.alias_id = alias_id;

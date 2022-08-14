@@ -5,7 +5,6 @@ use iota_client::block::output::AliasId;
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct AnchorConfig {
-    pub index_cid: Option<String>,
     pub alias_id: AliasId,
     pub mnemonic: String,
     pub ipfs_gateway_addrs: Vec<String>,

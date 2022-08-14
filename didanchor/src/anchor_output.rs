@@ -1,6 +1,5 @@
 use identity_core::convert::ToJson;
 use iota_client::{
-    api_types::responses::OutputResponse,
     block::{
         address::Address,
         output::{
@@ -17,18 +16,21 @@ use iota_client::{
     Client,
 };
 
+use crate::resolve_alias_output;
+
 pub static IOTA_NETWORK_ENDPOINT: &str = "https://api.alphanet.iotaledger.net";
 // static FAUCET_URL: &str = "https://faucet.alphanet.iotaledger.net/api/enqueue";
 
-pub struct AnchorAlias {
-    client: Client,
-    pub id: Option<AliasId>,
+#[derive(Debug)]
+pub struct AnchorOutput {
+    pub(crate) client: Client,
+    pub(crate) alias_id: AliasId,
     // insecure.
     secret_manager: SecretManager,
 }
 
-impl AnchorAlias {
-    pub fn new(mnemonic: String) -> anyhow::Result<Self> {
+impl AnchorOutput {
+    pub fn new(mnemonic: String, alias_id: AliasId) -> anyhow::Result<Self> {
         let client: Client = Client::builder()
             .with_primary_node(IOTA_NETWORK_ENDPOINT, None)?
             .finish()?;
@@ -36,17 +38,11 @@ impl AnchorAlias {
         let secret_manager: SecretManager =
             SecretManager::Mnemonic(MnemonicSecretManager::try_from_mnemonic(&mnemonic)?);
 
-        Ok(AnchorAlias {
+        Ok(AnchorOutput {
             client,
-            id: None,
+            alias_id,
             secret_manager,
         })
-    }
-
-    pub fn new_with_id(id: AliasId, mnemonic: String) -> anyhow::Result<Self> {
-        let mut anchor_alias = Self::new(mnemonic)?;
-        anchor_alias.id = Some(id);
-        Ok(anchor_alias)
     }
 
     pub async fn publish_output(&mut self, content: AliasContent) -> anyhow::Result<AliasId> {
@@ -56,12 +52,11 @@ impl AnchorAlias {
 
         let rent_structure = self.client.get_rent_structure().await?;
 
-        let alias_output: AliasOutput = match self.id {
-            Some(alias_id) => {
-                self.update_output(content_vec, rent_structure, alias_id)
-                    .await?
-            }
-            None => self.new_output(content_vec, rent_structure).await?,
+        let alias_output: AliasOutput = if self.alias_id.is_null() {
+            self.new_output(content_vec, rent_structure).await?
+        } else {
+            self.update_output(content_vec, rent_structure, self.alias_id)
+                .await?
         };
 
         let block: Block = self
@@ -84,7 +79,7 @@ impl AnchorAlias {
 
         log::debug!("published output with id {alias_id}");
 
-        self.id = Some(alias_id);
+        self.alias_id = alias_id;
 
         Ok(alias_id)
     }
@@ -123,7 +118,9 @@ impl AnchorAlias {
         rent_structure: RentStructure,
         alias_id: AliasId,
     ) -> anyhow::Result<AliasOutput> {
-        let (alias_id, _, alias_output) = self.resolve_alias_output(alias_id).await?;
+        let (alias_id, _, alias_output) = resolve_alias_output(&self.client, alias_id)
+            .await?
+            .ok_or_else(|| anyhow::anyhow!("no output found for alias id {alias_id}"))?;
 
         let mut alias_output_builder: AliasOutputBuilder = AliasOutputBuilder::from(&alias_output)
             .with_minimum_storage_deposit(rent_structure)
@@ -135,22 +132,6 @@ impl AnchorAlias {
         }
 
         Ok(alias_output_builder.finish()?)
-    }
-
-    /// Resolve a did into an Alias Output and the associated identifiers.
-    async fn resolve_alias_output(
-        &self,
-        alias_id: AliasId,
-    ) -> anyhow::Result<(AliasId, OutputId, AliasOutput)> {
-        let output_id: OutputId = self.client.alias_output_id(alias_id).await?;
-        let output_response: OutputResponse = self.client.get_output(&output_id).await?;
-        let output: Output = Output::try_from(&output_response.output)?;
-
-        if let Output::Alias(alias_output) = output {
-            Ok((alias_id, output_id, alias_output))
-        } else {
-            unreachable!("we requested an alias output. (TODO: turn into error later, though.)");
-        }
     }
 
     /// Returns all DID documents of the Alias Outputs contained in the payload's transaction, if any.

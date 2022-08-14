@@ -44,7 +44,7 @@ impl IpfsCluster {
             .query(&[("replication-min", "-1"), ("replication-max", "-1")])
             .build()?;
 
-        log::debug!("{request:?}");
+        log::trace!("{request:?}");
 
         let response = self.client.execute(request).await?;
         let add_response: AddResponse = response.json().await?;
@@ -58,7 +58,7 @@ impl IpfsCluster {
 
         let request = self.client.delete(endpoint).build()?;
 
-        log::debug!("{request:?}");
+        log::trace!("{request:?}");
 
         let response = self.client.execute(request).await?;
 

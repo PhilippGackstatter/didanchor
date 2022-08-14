@@ -10,7 +10,7 @@ use iota_client::{
     Client,
 };
 
-use crate::{tangle, AliasContent, ChainStorage, DIDIndex};
+use crate::{anchor_output, AliasContent, ChainStorage, DIDIndex};
 
 pub struct Resolver {
     client: Client,
@@ -19,7 +19,7 @@ pub struct Resolver {
 impl Resolver {
     pub fn new() -> anyhow::Result<Self> {
         let client: Client = Client::builder()
-            .with_primary_node(tangle::IOTA_NETWORK_ENDPOINT, None)?
+            .with_primary_node(anchor_output::IOTA_NETWORK_ENDPOINT, None)?
             .finish()?;
 
         Ok(Self { client })
@@ -34,9 +34,9 @@ impl Resolver {
         let alias_id: AliasId = AliasId::new(prefix_hex::decode(split.next().unwrap()).unwrap());
         let did_tag = split.next().unwrap();
 
-        let output = self.resolve_alias_output(alias_id).await?;
-
-        let content: AliasContent = AliasContent::from_json_slice(output.2.state_metadata())?;
+        let content: AliasContent = resolve_alias_content(&self.client, alias_id)
+            .await?
+            .ok_or_else(|| anyhow::anyhow!("no output found for alias id {alias_id}"))?;
 
         let chain_storage = ChainStorage::new(content.ipfs_gateway_addrs);
         let index: DIDIndex = chain_storage.get_index(&content.index_cid).await?;
@@ -59,19 +59,39 @@ impl Resolver {
             None => Ok(None),
         }
     }
+}
 
-    async fn resolve_alias_output(
-        &self,
-        alias_id: AliasId,
-    ) -> anyhow::Result<(AliasId, OutputId, AliasOutput)> {
-        let output_id: OutputId = self.client.alias_output_id(alias_id).await?;
-        let output_response: OutputResponse = self.client.get_output(&output_id).await?;
-        let output: Output = Output::try_from(&output_response.output)?;
+pub(crate) async fn resolve_alias_content(
+    client: &Client,
+    alias_id: AliasId,
+) -> anyhow::Result<Option<AliasContent>> {
+    let (_, _, alias_output) = if let Some(output) = resolve_alias_output(client, alias_id).await? {
+        output
+    } else {
+        return Ok(None);
+    };
 
-        if let Output::Alias(alias_output) = output {
-            Ok((alias_id, output_id, alias_output))
-        } else {
-            unreachable!("we requested an alias output. (TODO: turn into error later, though.)");
-        }
+    let content: AliasContent = AliasContent::from_json_slice(alias_output.state_metadata())?;
+    Ok(Some(content))
+}
+
+/// Resolve a did into an Alias Output and the associated identifiers.
+pub(crate) async fn resolve_alias_output(
+    client: &Client,
+    alias_id: AliasId,
+) -> anyhow::Result<Option<(AliasId, OutputId, AliasOutput)>> {
+    let output_id: OutputId = match client.alias_output_id(alias_id).await {
+        Ok(output_id) => output_id,
+        Err(iota_client::Error::NotFound) => return Ok(None),
+        Err(err) => anyhow::bail!(err),
+    };
+
+    let output_response: OutputResponse = client.get_output(&output_id).await?;
+    let output: Output = Output::try_from(&output_response.output)?;
+
+    if let Output::Alias(alias_output) = output {
+        Ok(Some((alias_id, output_id, alias_output)))
+    } else {
+        unreachable!("we requested an alias output. (TODO: turn into error later, though.)");
     }
 }

@@ -15,7 +15,7 @@ use packable::{
 use crate::{ChainOfCustody, IpfsGateway};
 
 /// Storage for Chains of custodies.
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub struct ChainStorage {
     ipfs_gateway: IpfsGateway,
     ipfs_cluster: IpfsCluster,
@@ -35,7 +35,7 @@ impl ChainStorage {
         verif_chain_of_custody: &VerifiableChainOfCustody,
     ) -> anyhow::Result<String> {
         log::debug!(
-            "adding coc for {}",
+            "ipfs add {}",
             verif_chain_of_custody.chain_of_custody.0[0].document.id()
         );
 
@@ -47,7 +47,7 @@ impl ChainStorage {
     }
 
     pub async fn unpin(&self, cid: &str) -> anyhow::Result<()> {
-        log::debug!("unpinning {cid}");
+        log::debug!("ipfs pin rm {cid}");
 
         self.ipfs_cluster.unpin(cid).await?;
 
