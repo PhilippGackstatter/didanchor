@@ -1,7 +1,3 @@
-#![allow(dead_code)]
-#![allow(unused_imports)]
-#![allow(unused_variables)]
-
 use didanchor::Anchor;
 use identity_core::{
     common::Url,
@@ -22,9 +18,9 @@ async fn main() -> anyhow::Result<()> {
     let mut node = Anchor::new().await?;
 
     let (keypair1, doc1) = gen_document();
-    let (keypair2, doc2) = gen_document();
-    let (keypair3, doc3) = gen_document();
-    let (keypair4, doc4) = gen_document();
+    let (_keypair2, doc2) = gen_document();
+    let (_keypair3, doc3) = gen_document();
+    let (_keypair4, doc4) = gen_document();
 
     node.update_document(doc1.clone()).await?;
     node.update_document(doc2).await?;
@@ -38,7 +34,7 @@ async fn main() -> anyhow::Result<()> {
             doc.id(),
             "#my-service",
             "AnchorService",
-            "http://ipfs.com",
+            "http://ipfs.iota",
         ));
     });
 

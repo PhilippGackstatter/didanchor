@@ -23,10 +23,13 @@ pub struct Anchor {
 
 impl Anchor {
     pub async fn new() -> anyhow::Result<Self> {
-        let config = AnchorConfig::read_default_location().await?;
+        let config: AnchorConfig = AnchorConfig::read_default_location().await?;
 
-        let anchor_output: AnchorOutput =
-            AnchorOutput::new(config.mnemonic.clone(), config.alias_id)?;
+        let anchor_output: AnchorOutput = AnchorOutput::new(
+            config.mnemonic.clone(),
+            config.alias_id,
+            &config.iota_endpoint,
+        )?;
 
         // Retrieve the current alias output to obtain the latest index cid.
         // We could store this locally, but this way seems safer overall.

@@ -1,4 +1,4 @@
-use didanchor::Resolver;
+use didanchor::{AnchorConfig, Resolver};
 use identity_core::convert::ToJson;
 use identity_did::did::CoreDID;
 
@@ -10,9 +10,11 @@ async fn main() -> anyhow::Result<()> {
         anyhow::anyhow!("expected a `did:iota:<alias_id>:<tag>` as the first argument")
     })?;
 
-    let did = CoreDID::parse(did)?;
+    let did: CoreDID = CoreDID::parse(did)?;
 
-    let resolver = Resolver::new()?;
+    let config: AnchorConfig = AnchorConfig::read_default_location().await?;
+
+    let resolver = Resolver::new(&config.iota_endpoint)?;
 
     match resolver.resolve(&did).await? {
         Some(document) => {

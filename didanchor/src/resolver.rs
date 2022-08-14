@@ -10,16 +10,16 @@ use iota_client::{
     Client,
 };
 
-use crate::{anchor_output, AliasContent, ChainStorage, DIDIndex};
+use crate::{AliasContent, ChainStorage, DIDIndex};
 
 pub struct Resolver {
     client: Client,
 }
 
 impl Resolver {
-    pub fn new() -> anyhow::Result<Self> {
+    pub fn new(iota_endpoint: &str) -> anyhow::Result<Self> {
         let client: Client = Client::builder()
-            .with_primary_node(anchor_output::IOTA_NETWORK_ENDPOINT, None)?
+            .with_primary_node(iota_endpoint, None)?
             .finish()?;
 
         Ok(Self { client })

@@ -7,11 +7,12 @@ use iota_client::block::output::AliasId;
 pub struct AnchorConfig {
     pub alias_id: AliasId,
     pub mnemonic: String,
+    pub iota_endpoint: String,
     pub ipfs_gateway_addrs: Vec<String>,
 }
 
 impl AnchorConfig {
-    const DEFAULT_PATH: &'static str = "./anchor_config.json";
+    pub const DEFAULT_PATH: &'static str = "./anchor_config.json";
 
     pub async fn read(path: impl AsRef<Path>) -> anyhow::Result<Self> {
         log::debug!("reading config from {}", path.as_ref().display());

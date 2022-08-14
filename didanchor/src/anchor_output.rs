@@ -18,9 +18,6 @@ use iota_client::{
 
 use crate::resolve_alias_output;
 
-pub static IOTA_NETWORK_ENDPOINT: &str = "https://api.alphanet.iotaledger.net";
-// static FAUCET_URL: &str = "https://faucet.alphanet.iotaledger.net/api/enqueue";
-
 #[derive(Debug)]
 pub struct AnchorOutput {
     pub(crate) client: Client,
@@ -30,9 +27,9 @@ pub struct AnchorOutput {
 }
 
 impl AnchorOutput {
-    pub fn new(mnemonic: String, alias_id: AliasId) -> anyhow::Result<Self> {
+    pub fn new(mnemonic: String, alias_id: AliasId, iota_endpoint: &str) -> anyhow::Result<Self> {
         let client: Client = Client::builder()
-            .with_primary_node(IOTA_NETWORK_ENDPOINT, None)?
+            .with_primary_node(iota_endpoint, None)?
             .finish()?;
 
         let secret_manager: SecretManager =

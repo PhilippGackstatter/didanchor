@@ -1,24 +1,9 @@
-#![allow(dead_code)]
-#![allow(unused_imports)]
-#![allow(unused_variables)]
+use didanchor::AnchorConfig;
 
-use identity_core::crypto::KeyPair;
 use identity_core::crypto::KeyType;
-use identity_did::did::DID;
-use identity_did::verification::MethodRelationship;
-use identity_did::verification::MethodScope;
-
 use iota_client::block::address::Address;
-use iota_client::block::address::AliasAddress;
-use iota_client::block::output::unlock_condition::GovernorAddressUnlockCondition;
-use iota_client::block::output::unlock_condition::ImmutableAliasAddressUnlockCondition;
-use iota_client::block::output::unlock_condition::StateControllerAddressUnlockCondition;
 use iota_client::block::output::AliasId;
-use iota_client::block::output::AliasOutput;
-use iota_client::block::output::AliasOutputBuilder;
 use iota_client::block::output::Output;
-use iota_client::block::output::UnlockCondition;
-use iota_client::block::Block;
 use iota_client::constants::SHIMMER_TESTNET_BECH32_HRP;
 use iota_client::crypto::keys::bip39;
 use iota_client::node_api::indexer::query_parameters::QueryParameter;
@@ -26,30 +11,45 @@ use iota_client::secret::mnemonic::MnemonicSecretManager;
 use iota_client::secret::SecretManager;
 use iota_client::Client;
 
-static ENDPOINT: &str = "https://api.alphanet.iotaledger.net";
+static DEFAULT_ENDPOINT: &str = "https://api.alphanet.iotaledger.net";
 static FAUCET_URL: &str = "https://faucet.alphanet.iotaledger.net/api/enqueue";
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
     let client: Client = Client::builder()
-        .with_primary_node(ENDPOINT, None)?
+        .with_primary_node(DEFAULT_ENDPOINT, None)?
         .finish()?;
 
-    get_address_with_funds(&client).await?;
+    let (mnemonic, _, _) = get_address_with_funds(&client).await?;
+
+    let config = AnchorConfig {
+        alias_id: AliasId::null(),
+        mnemonic,
+        iota_endpoint: DEFAULT_ENDPOINT.to_owned(),
+        ipfs_gateway_addrs: vec![
+            "http://127.0.0.1:8080".to_owned(),
+            "http://127.0.0.1:8081".to_owned(),
+            "http://127.0.0.1:8082".to_owned(),
+        ],
+    };
+
+    config.write_default_location().await?;
+
+    println!("successfully initialized {}", AnchorConfig::DEFAULT_PATH);
 
     Ok(())
 }
 
 /// Creates a new address and SecretManager with funds from the testnet faucet.
-async fn get_address_with_funds(client: &Client) -> anyhow::Result<(Address, SecretManager)> {
+async fn get_address_with_funds(
+    client: &Client,
+) -> anyhow::Result<(String, Address, SecretManager)> {
     let keypair = identity_core::crypto::KeyPair::new(KeyType::Ed25519)?;
     let mnemonic = iota_client::crypto::keys::bip39::wordlist::encode(
         keypair.private().as_ref(),
         &bip39::wordlist::ENGLISH,
     )
     .map_err(|err| anyhow::anyhow!(format!("{err:?}")))?;
-
-    println!("{mnemonic}");
 
     let secret_manager =
         SecretManager::Mnemonic(MnemonicSecretManager::try_from_mnemonic(&mnemonic)?);
@@ -62,7 +62,7 @@ async fn get_address_with_funds(client: &Client) -> anyhow::Result<(Address, Sec
 
     request_faucet_funds(client, address).await?;
 
-    Ok((address, secret_manager))
+    Ok((mnemonic, address, secret_manager))
 }
 
 /// Requests funds from the testnet faucet for the given `address`.
