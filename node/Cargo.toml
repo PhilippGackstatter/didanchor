@@ -20,7 +20,7 @@ serde = "1.0"
 packable = "0.5.0"
 futures = "0.3"
 rand = "0.8.5"
-tokio = "1"
+tokio = { version = "1", features = ["fs"] }
 http = "0.2"
 ipfs_cluster = { path = "../ipfs_cluster" }
 log = "0.4"

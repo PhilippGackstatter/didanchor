@@ -87,31 +87,22 @@ impl ChainStorage {
         Ok(Some(coc))
     }
 
-    pub async fn get_index(&self) -> anyhow::Result<Option<DIDIndex>> {
-        log::debug!("retrieving index from {}", self.index_name().await?);
+    pub async fn get_index(&self, index_cid: &str) -> anyhow::Result<DIDIndex> {
+        log::debug!("retrieving index from {}", index_cid);
 
-        let cid: String = self.ipfs.name_resolve(None, false, false).await?.path;
+        let json = self.get_bytes(index_cid).await?;
 
-        let json = self.get_bytes(&cid).await?;
-
-        if json.is_empty() {
-            Ok(None)
-        } else {
-            Ok(Some(DIDIndex::from_json_slice(&json)?))
-        }
+        Ok(DIDIndex::from_json_slice(&json)?)
     }
 
-    pub async fn publish_index(&self, index: &DIDIndex) -> anyhow::Result<()> {
+    /// Publishes the given [`DIDIndex`] and returns its CID.
+    pub async fn publish_index(&self, index: &DIDIndex) -> anyhow::Result<String> {
         log::debug!("publishing index");
         let json: Vec<u8> = index.to_json_vec()?;
 
         let cid = self.ipfs_cluster.add(json).await?.cid;
 
-        self.ipfs
-            .name_publish(&cid, false, None, None, None)
-            .await?;
-
-        Ok(())
+        Ok(cid)
     }
 
     async fn get_bytes(&self, cid: &str) -> anyhow::Result<Vec<u8>> {
@@ -121,19 +112,6 @@ impl ChainStorage {
             .map_ok(|chunk| chunk.to_vec())
             .try_concat()
             .await?)
-    }
-
-    /// Returns the IPNS name on which the index is stored.
-    pub async fn index_name(&self) -> anyhow::Result<String> {
-        Ok(self
-            .ipfs
-            .key_list()
-            .await?
-            .keys
-            .into_iter()
-            .next()
-            .unwrap()
-            .id)
     }
 }
 

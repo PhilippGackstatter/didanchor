@@ -5,26 +5,36 @@ use identity_iota_client::document::ResolvedIotaDocument;
 use identity_iota_core::did::IotaDID;
 use merkle_tree::Proof;
 
-use crate::{ChainOfCustody, ChainStorage, DIDIndex, MerkleDIDs, VerifiableChainOfCustody};
+use crate::{
+    AnchorConfig, ChainOfCustody, ChainStorage, DIDIndex, MerkleDIDs, VerifiableChainOfCustody,
+};
 
 pub struct Anchor {
     storage: ChainStorage,
     merkle: MerkleDIDs,
     uncommitted_chains: HashMap<IotaDID, ChainOfCustody>,
     index: DIDIndex,
+    config: AnchorConfig,
 }
 
 impl Anchor {
     pub async fn new() -> anyhow::Result<Self> {
         let storage = ChainStorage::new();
 
-        let index = storage.get_index().await?.unwrap_or_default();
+        let config = AnchorConfig::read_default_location().await?;
+
+        let index: DIDIndex = if let Some(ref index_cid) = config.index_cid {
+            storage.get_index(index_cid).await?
+        } else {
+            DIDIndex::new()
+        };
 
         Ok(Self {
             storage,
             merkle: MerkleDIDs::new(),
             uncommitted_chains: HashMap::new(),
             index,
+            config,
         })
     }
 
@@ -74,7 +84,10 @@ impl Anchor {
             self.index.insert(did, content_id);
         }
 
-        self.storage.publish_index(&self.index).await?;
+        let index_cid = self.storage.publish_index(&self.index).await?;
+        self.config.index_cid = Some(index_cid);
+
+        self.config.write_default_location().await?;
 
         // TODO: Store merkle root in alias output.
 
