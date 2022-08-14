@@ -6,12 +6,12 @@ use reqwest::{
 use crate::AddResponse;
 
 #[derive(Debug, Clone)]
-pub struct IpfsClusterClient {
+pub struct IpfsCluster {
     client: Client,
     hostname: String,
 }
 
-impl IpfsClusterClient {
+impl IpfsCluster {
     pub fn new() -> Self {
         let client = Client::new();
 
@@ -73,7 +73,7 @@ impl IpfsClusterClient {
     }
 }
 
-impl Default for IpfsClusterClient {
+impl Default for IpfsCluster {
     fn default() -> Self {
         Self::new()
     }

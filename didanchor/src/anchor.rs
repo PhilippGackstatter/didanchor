@@ -3,6 +3,7 @@ use std::collections::HashMap;
 use anyhow::Context;
 use identity_iota_client::document::ResolvedIotaDocument;
 use identity_iota_core::did::IotaDID;
+use iota_client::block::output::AliasId;
 use merkle_tree::Proof;
 
 use crate::{
@@ -21,9 +22,9 @@ pub struct Anchor {
 
 impl Anchor {
     pub async fn new() -> anyhow::Result<Self> {
-        let storage = ChainStorage::new();
-
         let config = AnchorConfig::read_default_location().await?;
+
+        let storage = ChainStorage::new(config.ipfs_gateway_addrs.clone());
 
         let index: DIDIndex = if let Some(ref index_cid) = config.index_cid {
             storage.get_index(index_cid).await?
@@ -64,7 +65,7 @@ impl Anchor {
         Ok(())
     }
 
-    pub async fn commit_changes(&mut self) -> anyhow::Result<()> {
+    pub async fn commit_changes(&mut self) -> anyhow::Result<AliasId> {
         let mut uncommitted_chains = HashMap::new();
 
         std::mem::swap(&mut self.uncommitted_chains, &mut uncommitted_chains);
@@ -90,6 +91,8 @@ impl Anchor {
             self.index.insert(did, content_id);
         }
 
+        // TODO: Unpin old index.
+
         let index_cid = self.storage.publish_index(&self.index).await?;
         self.config.index_cid = Some(index_cid.clone());
 
@@ -97,7 +100,7 @@ impl Anchor {
 
         let content = AliasContent::new(
             index_cid,
-            self.config.ipfs_node_addrs.clone(),
+            self.config.ipfs_gateway_addrs.clone(),
             self.merkle.merkle_root(),
         );
 
@@ -108,6 +111,6 @@ impl Anchor {
 
         self.config.write_default_location().await?;
 
-        Ok(())
+        Ok(alias_id)
     }
 }

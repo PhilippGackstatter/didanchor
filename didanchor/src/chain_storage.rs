@@ -1,12 +1,10 @@
 use std::collections::HashMap;
 
+use bytes::Bytes;
 use crypto::hashes::blake2b::Blake2b256;
-use futures::TryStreamExt;
-use http::uri::Scheme;
 use identity_core::convert::{FromJson, ToJson};
 use identity_iota_core::did::IotaDID;
-use ipfs_api_backend_hyper::{IpfsApi, IpfsClient, TryFromUri};
-use ipfs_cluster::IpfsClusterClient;
+use ipfs_cluster::IpfsCluster;
 use merkle_tree::Proof;
 use packable::{
     error::{UnpackError, UnpackErrorExt},
@@ -14,32 +12,21 @@ use packable::{
     Packable, PackableExt,
 };
 
-use crate::ChainOfCustody;
+use crate::{ChainOfCustody, IpfsGateway};
 
 /// Storage for Chains of custodies.
-#[derive(Clone, Default)]
+#[derive(Clone)]
 pub struct ChainStorage {
-    ipfs: IpfsClient,
-    ipfs_cluster: IpfsClusterClient,
+    ipfs_gateway: IpfsGateway,
+    ipfs_cluster: IpfsCluster,
 }
 
 impl ChainStorage {
-    pub fn new() -> Self {
+    pub fn new(ipfs_gateway_addrs: Vec<String>) -> Self {
         Self {
-            ipfs: IpfsClient::default(),
-            ipfs_cluster: IpfsClusterClient::default(),
+            ipfs_gateway: IpfsGateway::new(ipfs_gateway_addrs),
+            ipfs_cluster: IpfsCluster::default(),
         }
-    }
-
-    pub fn new_with_host(
-        ipfs_hostname: &str,
-        ipfs_port: u16,
-        ipfs_cluster_hostname: &str,
-    ) -> anyhow::Result<Self> {
-        let ipfs = IpfsClient::from_host_and_port(Scheme::HTTP, ipfs_hostname, ipfs_port)?;
-        let ipfs_cluster = IpfsClusterClient::new_with_host(ipfs_cluster_hostname);
-
-        Ok(Self { ipfs, ipfs_cluster })
     }
 
     /// Adds and pins the given [`VerifiableChainOfCustody`].
@@ -78,9 +65,9 @@ impl ChainStorage {
             return Ok(None);
         };
 
-        let bytes = self.get_bytes(cid).await?;
+        let bytes: Bytes = self.get_bytes(cid).await?;
 
-        let mut unpacker = SliceUnpacker::new(bytes.as_slice());
+        let mut unpacker = SliceUnpacker::new(bytes.as_ref());
         let coc: VerifiableChainOfCustody =
             VerifiableChainOfCustody::unpack::<_, false>(&mut unpacker).expect("TODO");
 
@@ -105,13 +92,8 @@ impl ChainStorage {
         Ok(cid)
     }
 
-    async fn get_bytes(&self, cid: &str) -> anyhow::Result<Vec<u8>> {
-        Ok(self
-            .ipfs
-            .cat(cid)
-            .map_ok(|chunk| chunk.to_vec())
-            .try_concat()
-            .await?)
+    async fn get_bytes(&self, cid: &str) -> anyhow::Result<Bytes> {
+        self.ipfs_gateway.get(cid).await
     }
 }
 

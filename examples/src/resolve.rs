@@ -1,29 +1,27 @@
+use didanchor::Resolver;
+use identity_core::convert::ToJson;
 use identity_did::did::CoreDID;
-use identity_iota_core::did::IotaDID;
-use node::AnchorConfig;
-use node::Resolver;
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
-    let config = AnchorConfig::read_default_location().await?;
+    let mut args = std::env::args();
 
-    let iota_did = IotaDID::parse("did:iota:ChSJ2aM4V31CNCRnVbmGh7hU1hqbZ36ZSoPbArso5Y6N").unwrap();
-    let alias_id = config.alias_id;
+    let did: String = args.nth(1).ok_or_else(|| {
+        anyhow::anyhow!("expected a `did:iota:<alias_id>:<tag>` as the first argument")
+    })?;
 
-    // TODO: Should be obtained from the output.
-    let node_addr = config.ipfs_node_addrs.into_iter().next().unwrap();
+    let did = CoreDID::parse(did)?;
 
-    let did = CoreDID::parse(format!("did:iota:{alias_id}:{}", iota_did.tag())).unwrap();
+    let resolver = Resolver::new()?;
 
-    let (hostname, port) = { (node_addr.0, node_addr.1.parse::<u16>().unwrap()) };
-
-    println!("retrieving from IPFS node {hostname}:{port}");
-
-    let resolver = Resolver::new(&hostname, port)?;
-
-    let document = resolver.resolve(did).await?;
-
-    println!("Resolved document {document:#?}");
+    match resolver.resolve(&did).await? {
+        Some(document) => {
+            println!("{}", document.to_json_pretty()?);
+        }
+        None => {
+            println!("Unable to resolve {did}");
+        }
+    }
 
     Ok(())
 }

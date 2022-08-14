@@ -15,15 +15,16 @@ iota-crypto = { version = "0.13.0", features = [
   "sha",
 ], default-features = false }
 merkle_tree = { path = "../merkle_tree" }
-ipfs-api-backend-hyper = { version = "0.5", features = ["with-hyper-rustls"] }
+reqwest = { version = "0.11.11", default-features = false, features = ["multipart"] }
 serde = "1.0"
 packable = "0.5.0"
 futures = "0.3"
 tokio = { version = "1", default-features = false, features = ["fs"] }
-http = "0.2"
+rand = "0.8.5"
 ipfs_cluster = { path = "../ipfs_cluster" }
 log = "0.4"
 prefix-hex = "0.4"
+bytes = "1"
 
 [dependencies.iota-client]
 git = "https://github.com/iotaledger/iota.rs"
@@ -31,5 +32,3 @@ rev = "3cfeabd82f60c47305159af114b404291041af7d" # develop branch, 2022-08-10
 features = ["tls"]
 default-features = false
 
-[dev-dependencies]
-rand = "0.8.5"

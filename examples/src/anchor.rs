@@ -2,6 +2,7 @@
 #![allow(unused_imports)]
 #![allow(unused_variables)]
 
+use didanchor::Anchor;
 use identity_core::{
     common::Url,
     crypto::{KeyPair, KeyType},
@@ -13,7 +14,6 @@ use identity_iota_core::{
     document::{IotaDocument, IotaService, IotaVerificationMethod},
     tangle::MessageId,
 };
-use didanchor::Anchor;
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
@@ -51,9 +51,9 @@ async fn main() -> anyhow::Result<()> {
 
     node.update_document(doc1.clone()).await?;
 
-    node.commit_changes().await?;
+    let alias_id = node.commit_changes().await?;
 
-    println!("updated {} several times", doc1.document.id());
+    println!("did:iota:{}:{}", alias_id, doc1.document.id().tag());
 
     Ok(())
 }

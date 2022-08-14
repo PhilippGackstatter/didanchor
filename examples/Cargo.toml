@@ -25,5 +25,9 @@ path = "src/anchor.rs"
 name = "anchor"
 
 [[example]]
-path = "src/mnemonic.rs"
+path = "src/init.rs"
 name = "init"
+
+[[example]]
+path = "src/resolve.rs"
+name = "resolve"

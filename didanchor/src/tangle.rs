@@ -180,19 +180,15 @@ impl AnchorAlias {
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct AliasContent {
     pub index_cid: String,
-    pub ipfs_node_addrs: Vec<(String, String)>,
+    pub ipfs_gateway_addrs: Vec<String>,
     pub merkle_root: Vec<u8>,
 }
 
 impl AliasContent {
-    pub fn new(
-        index_cid: String,
-        ipfs_node_addrs: Vec<(String, String)>,
-        merkle_root: Vec<u8>,
-    ) -> Self {
+    pub fn new(index_cid: String, ipfs_gateway_addrs: Vec<String>, merkle_root: Vec<u8>) -> Self {
         Self {
             index_cid,
-            ipfs_node_addrs,
+            ipfs_gateway_addrs,
             merkle_root,
         }
     }

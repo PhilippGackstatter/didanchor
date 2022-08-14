@@ -13,26 +13,23 @@ use iota_client::{
 use crate::{tangle, AliasContent, ChainStorage, DIDIndex};
 
 pub struct Resolver {
-    storage: ChainStorage,
     client: Client,
 }
 
 impl Resolver {
-    pub fn new(hostname: &str, port: u16) -> anyhow::Result<Self> {
-        let storage = ChainStorage::new_with_host(hostname, port, "http://127.0.0.1:9094")?;
-
+    pub fn new() -> anyhow::Result<Self> {
         let client: Client = Client::builder()
             .with_primary_node(tangle::IOTA_NETWORK_ENDPOINT, None)?
             .finish()?;
 
-        Ok(Self { storage, client })
+        Ok(Self { client })
     }
 
     /// Resolve the given did into its corresponding DID document.
     ///
     /// Ensures validity in the chain of custody, as well as ensuring it is the version of the CoC
     /// committed to by the anchoring node.
-    pub async fn resolve(&self, did: CoreDID) -> anyhow::Result<Option<CoreDocument>> {
+    pub async fn resolve(&self, did: &CoreDID) -> anyhow::Result<Option<CoreDocument>> {
         let mut split = did.method_id().split(':');
         let alias_id: AliasId = AliasId::new(prefix_hex::decode(split.next().unwrap()).unwrap());
         let did_tag = split.next().unwrap();
@@ -40,11 +37,13 @@ impl Resolver {
         let output = self.resolve_alias_output(alias_id).await?;
 
         let content: AliasContent = AliasContent::from_json_slice(output.2.state_metadata())?;
-        let index: DIDIndex = self.storage.get_index(&content.index_cid).await?;
+
+        let chain_storage = ChainStorage::new(content.ipfs_gateway_addrs);
+        let index: DIDIndex = chain_storage.get_index(&content.index_cid).await?;
 
         let did = IotaDID::parse(format!("did:iota:{did_tag}")).unwrap();
 
-        match self.storage.get(&did, &index).await? {
+        match chain_storage.get(&did, &index).await? {
             Some(coc) => {
                 let serialized = coc.chain_of_custody.serialize_to_vec()?;
                 let document = coc.chain_of_custody.into_document()?;
