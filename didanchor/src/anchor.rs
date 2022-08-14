@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::{collections::HashMap, time::Instant};
 
 use anyhow::Context;
 use identity_iota_client::document::ResolvedIotaDocument;
@@ -79,6 +79,9 @@ impl Anchor {
     }
 
     pub async fn commit_changes(&mut self) -> anyhow::Result<AliasId> {
+        let time = Instant::now();
+        let changes_to_commit = self.uncommitted_chains.len();
+
         let mut uncommitted_chains = HashMap::new();
 
         std::mem::swap(&mut self.uncommitted_chains, &mut uncommitted_chains);
@@ -121,10 +124,14 @@ impl Anchor {
 
         let alias_id = self.anchor_output.publish_output(content).await?;
 
-        // TODO: Find better place for config, share it via Arc?
         self.config.alias_id = alias_id;
 
         self.config.write_default_location().await?;
+
+        log::debug!(
+            "committed {changes_to_commit} change(s) in {}s",
+            time.elapsed().as_secs()
+        );
 
         Ok(alias_id)
     }

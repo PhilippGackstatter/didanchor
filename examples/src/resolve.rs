@@ -1,3 +1,5 @@
+use std::time::Instant;
+
 use didanchor::{AnchorConfig, Resolver};
 use identity_core::convert::ToJson;
 use identity_did::did::CoreDID;
@@ -14,11 +16,14 @@ async fn main() -> anyhow::Result<()> {
 
     let config: AnchorConfig = AnchorConfig::read_default_location().await?;
 
+    let time = Instant::now();
+
     let resolver = Resolver::new(&config.iota_endpoint)?;
 
     match resolver.resolve(&did).await? {
         Some(document) => {
             println!("{}", document.to_json_pretty()?);
+            println!("Resolution took {}ms", time.elapsed().as_millis());
         }
         None => {
             println!("Unable to resolve {did}");
