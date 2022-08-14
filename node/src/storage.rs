@@ -1,4 +1,4 @@
-use std::{collections::HashMap, io::Cursor};
+use std::collections::HashMap;
 
 use crypto::hashes::blake2b::Blake2b256;
 use futures::TryStreamExt;
@@ -47,6 +47,11 @@ impl ChainStorage {
         &self,
         verif_chain_of_custody: &VerifiableChainOfCustody,
     ) -> anyhow::Result<String> {
+        log::debug!(
+            "adding coc for {}",
+            verif_chain_of_custody.chain_of_custody.0[0].document.id()
+        );
+
         let packed: Vec<u8> = verif_chain_of_custody.pack_to_vec();
 
         let cid = self.ipfs_cluster.add(packed).await?.cid;
@@ -55,6 +60,8 @@ impl ChainStorage {
     }
 
     pub async fn unpin(&self, cid: &str) -> anyhow::Result<()> {
+        log::debug!("unpinning {cid}");
+
         self.ipfs_cluster.unpin(cid).await?;
 
         Ok(())
@@ -81,6 +88,8 @@ impl ChainStorage {
     }
 
     pub async fn get_index(&self) -> anyhow::Result<Option<DIDIndex>> {
+        log::debug!("retrieving index from {}", self.index_name().await?);
+
         let cid: String = self.ipfs.name_resolve(None, false, false).await?.path;
 
         let json = self.get_bytes(&cid).await?;
@@ -93,12 +102,14 @@ impl ChainStorage {
     }
 
     pub async fn publish_index(&self, index: &DIDIndex) -> anyhow::Result<()> {
+        log::debug!("publishing index");
         let json: Vec<u8> = index.to_json_vec()?;
-        let cursor = Cursor::new(json);
 
-        let cid = &self.ipfs.add(cursor).await?.hash;
+        let cid = self.ipfs_cluster.add(json).await?.cid;
 
-        self.ipfs.name_publish(cid, false, None, None, None).await?;
+        self.ipfs
+            .name_publish(&cid, false, None, None, None)
+            .await?;
 
         Ok(())
     }

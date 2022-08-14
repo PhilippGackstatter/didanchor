@@ -6,17 +6,19 @@ use identity_core::{
     common::Url,
     crypto::{KeyPair, KeyType},
 };
-use identity_did::did::DID;
+use identity_did::{did::DID, verification::MethodScope};
 use identity_iota_client::{document::ResolvedIotaDocument, tangle::TangleRef};
 use identity_iota_core::{
     did::IotaDID,
-    document::{IotaDocument, IotaService},
+    document::{IotaDocument, IotaService, IotaVerificationMethod},
     tangle::MessageId,
 };
 use node::Anchor;
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
+    pretty_env_logger::init();
+
     let mut node = Anchor::new().await?;
 
     let (keypair1, doc1) = gen_document();
@@ -40,7 +42,14 @@ async fn main() -> anyhow::Result<()> {
         ));
     });
 
-    node.update_document(doc1).await?;
+    node.update_document(doc1.clone()).await?;
+
+    let doc1 = update_document(&keypair1, doc1, |doc| {
+        doc.insert_method(method(doc.id(), "#key-2"), MethodScope::authentication())
+            .unwrap();
+    });
+
+    node.update_document(doc1.clone()).await?;
 
     node.commit_changes().await?;
 
@@ -65,6 +74,10 @@ fn gen_document() -> (KeyPair, ResolvedIotaDocument) {
     (keypair, doc)
 }
 
+fn random_message_id() -> MessageId {
+    MessageId::new(rand::random())
+}
+
 fn service(did: &IotaDID, fragment: &str, type_: &str, endpoint: &str) -> IotaService {
     IotaService::builder(Default::default())
         .id(did.to_url().join(fragment).unwrap())
@@ -74,8 +87,10 @@ fn service(did: &IotaDID, fragment: &str, type_: &str, endpoint: &str) -> IotaSe
         .unwrap()
 }
 
-fn random_message_id() -> MessageId {
-    MessageId::new(rand::random())
+fn method(did: &IotaDID, fragment: &str) -> IotaVerificationMethod {
+    let keypair = KeyPair::new(KeyType::Ed25519).unwrap();
+    IotaVerificationMethod::new(did.to_owned(), KeyType::Ed25519, keypair.public(), fragment)
+        .unwrap()
 }
 
 fn update_document<F>(

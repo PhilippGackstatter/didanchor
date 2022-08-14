@@ -44,6 +44,8 @@ impl IpfsClusterClient {
             .query(&[("replication-min", "-1"), ("replication-max", "-1")])
             .build()?;
 
+        log::debug!("{request:?}");
+
         let response = self.client.execute(request).await?;
         let add_response: AddResponse = response.json().await?;
 
@@ -55,6 +57,8 @@ impl IpfsClusterClient {
         let endpoint = format!("{}/pins/ipfs/{}", self.hostname, cid);
 
         let request = self.client.delete(endpoint).build()?;
+
+        log::debug!("{request:?}");
 
         let response = self.client.execute(request).await?;
 

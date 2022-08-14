@@ -1,5 +1,5 @@
 [package]
-name = "ipfs-cluster"
+name = "ipfs_cluster"
 version = "0.1.0"
 edition = "2021"
 
@@ -7,6 +7,7 @@ edition = "2021"
 reqwest = { version = "0.11.11", features = ["multipart"] }
 anyhow = "1"
 serde = "1"
+log = "0.4"
 
 [dev-dependencies]
 tokio = "1"

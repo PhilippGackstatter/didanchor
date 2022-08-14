@@ -1,2 +1,2 @@
 [workspace]
-members = ["node", "merkle_tree", "ipfs-cluster"]
+members = ["node", "merkle_tree", "ipfs_cluster"]

@@ -30,12 +30,16 @@ impl Anchor {
 
     pub async fn update_document(&mut self, document: ResolvedIotaDocument) -> anyhow::Result<()> {
         let did = document.document.id().to_owned();
-        // TODO: Check uncommitted_chains first, only then go to storage.
-        let chain_of_custody: Option<ChainOfCustody> = self
-            .storage
-            .get(&did, &self.index)
-            .await?
-            .map(|vcoc| vcoc.chain_of_custody);
+
+        let chain_of_custody: Option<ChainOfCustody> = match self.uncommitted_chains.remove(&did) {
+            coc @ Some(_) => coc,
+            None => self
+                .storage
+                .get(&did, &self.index)
+                .await?
+                .map(|vcoc| vcoc.chain_of_custody),
+        };
+
         let chain_of_custody: ChainOfCustody =
             self.merkle.update_document(chain_of_custody, document)?;
 
