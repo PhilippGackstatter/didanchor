@@ -3,32 +3,27 @@ name = "didanchor"
 version = "0.1.0"
 edition = "2021"
 
-
 [dependencies]
 anyhow = "1"
-identity_iota_core = "0.6.1"
+bytes = "1"
+futures = "0.3"
 identity_core = "0.6.1"
 identity_did = "0.6.1"
 identity_iota_client = "0.6.1"
-iota-crypto = { version = "0.13.0", features = [
-  "blake2b",
-  "sha",
-], default-features = false }
-merkle_tree = { path = "../merkle_tree" }
-reqwest = { version = "0.11.11", default-features = false, features = ["multipart"] }
-serde = "1.0"
-packable = "0.5.0"
-futures = "0.3"
-tokio = { version = "1", default-features = false, features = ["fs"] }
-rand = "0.8.5"
+identity_iota_core = "0.6.1"
+iota-crypto = { version = "0.13.0", features = ["blake2b", "sha"], default-features = false }
 ipfs_cluster = { path = "../ipfs_cluster" }
 log = "0.4"
+merkle_tree = { path = "../merkle_tree" }
+packable = "0.5.0"
 prefix-hex = "0.4"
-bytes = "1"
+rand = "0.8.5"
+reqwest = { version = "0.11.11", default-features = false, features = ["multipart"] }
+serde = "1.0"
+tokio = { version = "1", default-features = false, features = ["fs"] }
 
 [dependencies.iota-client]
 git = "https://github.com/iotaledger/iota.rs"
 rev = "3cfeabd82f60c47305159af114b404291041af7d" # develop branch, 2022-08-10
 features = ["tls"]
 default-features = false
-

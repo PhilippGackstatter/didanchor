@@ -3,14 +3,12 @@ name = "merkle_tree"
 version = "0.1.0"
 edition = "2021"
 
-
 [dependencies]
-iota-crypto = { version = "0.13.0", default-features = false, features = ["blake2b"] }
-digest = "0.10.3"
-typenum = "1.15.0"
-packable = "0.5.0"
 anyhow = "1.0"
+digest = "0.10.3"
+iota-crypto = { version = "0.13.0", default-features = false, features = ["blake2b"] }
+packable = "0.5.0"
+typenum = "1.15.0"
 
 [dev-dependencies]
 rand = "0.8.5"
-
