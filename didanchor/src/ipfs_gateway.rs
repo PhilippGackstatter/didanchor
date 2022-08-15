@@ -16,6 +16,7 @@ impl IpfsGateway {
         }
     }
 
+    // TODO: Make resolution trustless. Currently we just trust that the gateway returns the correct thing.
     pub async fn get(&self, cid: &str) -> anyhow::Result<Bytes> {
         // Pick a random gateway.
         let endpoint: &str = &self.ipfs_gateway_addrs

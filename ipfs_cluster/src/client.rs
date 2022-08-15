@@ -41,7 +41,12 @@ impl IpfsCluster {
             .post(endpoint)
             .multipart(form)
             // -1 means pinning it to every peer in the cluster.
-            .query(&[("replication-min", "-1"), ("replication-max", "-1")])
+            .query(&[
+                ("replication-min", "-1"),
+                ("replication-max", "-1"),
+                ("hash", "blake2b-256"),
+                ("cid-version", "1"),
+            ])
             .build()?;
 
         log::trace!("{request:?}");
