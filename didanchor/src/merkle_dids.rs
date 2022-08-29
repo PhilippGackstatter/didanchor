@@ -1,11 +1,10 @@
 use std::collections::HashMap;
 
 use crypto::hashes::blake2b::Blake2b256;
+use did_common::ChainOfCustody;
 use identity_iota_client::{chain::IntegrationChain, document::ResolvedIotaDocument};
 use identity_iota_core::did::IotaDID;
 use merkle_tree::{MerkleTree, Proof};
-
-use crate::{ChainOfCustody, SerializedChainOfCustody};
 
 #[derive(Clone)]
 pub struct MerkleDIDs {
@@ -71,7 +70,7 @@ impl MerkleDIDs {
 
                 let chain_of_custody: ChainOfCustody = ChainOfCustody(vec![document]);
 
-                let serialized: SerializedChainOfCustody = chain_of_custody.serialize_to_vec()?;
+                let serialized: Vec<u8> = chain_of_custody.serialize_to_vec()?;
 
                 let merkle_tree_index: usize = self.merkle_tree.push(serialized);
 

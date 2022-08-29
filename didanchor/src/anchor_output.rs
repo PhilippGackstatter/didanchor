@@ -16,7 +16,7 @@ use iota_client::{
     Client,
 };
 
-use crate::resolve_alias_output;
+use crate::{resolve_alias_output, AliasContent};
 
 #[derive(Debug)]
 pub struct AnchorOutput {
@@ -152,22 +152,5 @@ impl AnchorOutput {
         }
 
         Ok(documents)
-    }
-}
-
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
-pub struct AliasContent {
-    pub index_cid: String,
-    pub ipfs_gateway_addrs: Vec<String>,
-    pub merkle_root: Vec<u8>,
-}
-
-impl AliasContent {
-    pub fn new(index_cid: String, ipfs_gateway_addrs: Vec<String>, merkle_root: Vec<u8>) -> Self {
-        Self {
-            index_cid,
-            ipfs_gateway_addrs,
-            merkle_root,
-        }
     }
 }

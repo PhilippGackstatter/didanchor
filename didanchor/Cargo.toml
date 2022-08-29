@@ -6,12 +6,13 @@ edition = "2021"
 [dependencies]
 anyhow = "1"
 bytes = "1"
-futures = "0.3"
+did_common = { path = "../did_common" }
 identity_core = "0.6.1"
 identity_did = "0.6.1"
 identity_iota_client = "0.6.1"
 identity_iota_core = "0.6.1"
 iota-crypto = { version = "0.13.0", features = ["blake2b", "sha"], default-features = false }
+ipfs_client = { path = "../ipfs_client" }
 ipfs_cluster = { path = "../ipfs_cluster" }
 log = "0.4"
 merkle_tree = { path = "../merkle_tree" }
@@ -21,6 +22,7 @@ rand = "0.8.5"
 reqwest = { version = "0.11.11", default-features = false, features = ["multipart"] }
 serde = "1.0"
 tokio = { version = "1", default-features = false, features = ["fs"] }
+url = "2.2.2"
 
 [dependencies.iota-client]
 git = "https://github.com/iotaledger/iota.rs"

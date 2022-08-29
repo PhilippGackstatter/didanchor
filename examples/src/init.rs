@@ -1,3 +1,5 @@
+use std::str::FromStr;
+
 use didanchor::AnchorConfig;
 
 use identity_core::crypto::KeyType;
@@ -10,6 +12,7 @@ use iota_client::node_api::indexer::query_parameters::QueryParameter;
 use iota_client::secret::mnemonic::MnemonicSecretManager;
 use iota_client::secret::SecretManager;
 use iota_client::Client;
+use url::Url;
 
 static DEFAULT_ENDPOINT: &str = "https://api.alphanet.iotaledger.net";
 static FAUCET_URL: &str = "https://faucet.alphanet.iotaledger.net/api/enqueue";
@@ -26,10 +29,15 @@ async fn main() -> anyhow::Result<()> {
         alias_id: AliasId::null(),
         mnemonic,
         iota_endpoint: DEFAULT_ENDPOINT.to_owned(),
-        ipfs_gateway_addrs: vec![
-            "http://127.0.0.1:8080".to_owned(),
-            "http://127.0.0.1:8081".to_owned(),
-            "http://127.0.0.1:8082".to_owned(),
+        ipfs_node_addrs: vec![
+            Url::from_str("http://127.0.0.1:5001")?,
+            Url::from_str("http://127.0.0.1:5002")?,
+            Url::from_str("http://127.0.0.1:5003")?,
+        ],
+        ipfs_cluster_addrs: vec![
+            Url::from_str("http://127.0.0.1:9094")?,
+            Url::from_str("http://127.0.0.1:9095")?,
+            Url::from_str("http://127.0.0.1:9096")?,
         ],
     };
 

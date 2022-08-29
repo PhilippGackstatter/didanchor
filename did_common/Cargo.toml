@@ -1,0 +1,17 @@
+[package]
+name = "did_common"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+anyhow = "1.0.62"
+identity_core = "0.6.1"
+identity_did = "0.6.1"
+identity_iota_client = "0.6.1"
+identity_iota_core = "0.6.1"
+iota-crypto = { version = "0.13.0", features = ["blake2b", "sha"], default-features = false }
+merkle_tree = { path = "../merkle_tree" }
+packable = "0.5.0"
+serde = "1"

@@ -1,0 +1,11 @@
+[package]
+name = "ipfs_client"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+anyhow = "1.0.62"
+futures = "0.3.23"
+http = "0.2"
+ipfs-api-backend-hyper = { version = "0.5", features = ["with-hyper-rustls"] }
+url = "2.2.2"

@@ -2,13 +2,15 @@ use std::path::Path;
 
 use identity_core::convert::{FromJson, ToJson};
 use iota_client::block::output::AliasId;
+use url::Url;
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct AnchorConfig {
     pub alias_id: AliasId,
     pub mnemonic: String,
     pub iota_endpoint: String,
-    pub ipfs_gateway_addrs: Vec<String>,
+    pub ipfs_node_addrs: Vec<Url>,
+    pub ipfs_cluster_addrs: Vec<Url>,
 }
 
 impl AnchorConfig {

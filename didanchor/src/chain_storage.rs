@@ -1,32 +1,26 @@
 use std::collections::HashMap;
 
-use bytes::Bytes;
-use crypto::hashes::blake2b::Blake2b256;
+use did_common::VerifiableChainOfCustody;
 use identity_core::convert::{FromJson, ToJson};
 use identity_iota_core::did::IotaDID;
+use ipfs_client::IpfsClient;
 use ipfs_cluster::IpfsCluster;
-use merkle_tree::Proof;
-use packable::{
-    error::{UnpackError, UnpackErrorExt},
-    unpacker::SliceUnpacker,
-    Packable, PackableExt,
-};
-
-use crate::{ChainOfCustody, IpfsGateway};
+use packable::{unpacker::SliceUnpacker, Packable, PackableExt};
+use url::Url;
 
 /// Storage for Chains of custodies.
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct ChainStorage {
-    ipfs_gateway: IpfsGateway,
+    ipfs_client: IpfsClient,
     ipfs_cluster: IpfsCluster,
 }
 
 impl ChainStorage {
-    pub fn new(ipfs_gateway_addrs: Vec<String>) -> Self {
-        Self {
-            ipfs_gateway: IpfsGateway::new(ipfs_gateway_addrs),
-            ipfs_cluster: IpfsCluster::default(),
-        }
+    pub fn new(ipfs_cluster_addrs: Vec<Url>, ipfs_node_addrs: Vec<Url>) -> anyhow::Result<Self> {
+        Ok(Self {
+            ipfs_client: IpfsClient::new(ipfs_node_addrs)?,
+            ipfs_cluster: IpfsCluster::new(ipfs_cluster_addrs)?,
+        })
     }
 
     /// Adds and pins the given [`VerifiableChainOfCustody`].
@@ -65,7 +59,7 @@ impl ChainStorage {
             return Ok(None);
         };
 
-        let bytes: Bytes = self.get_bytes(cid).await?;
+        let bytes: Vec<u8> = self.get_bytes(cid).await?;
 
         let mut unpacker = SliceUnpacker::new(bytes.as_ref());
         let coc: VerifiableChainOfCustody =
@@ -92,62 +86,10 @@ impl ChainStorage {
         Ok(cid)
     }
 
-    async fn get_bytes(&self, cid: &str) -> anyhow::Result<Bytes> {
-        self.ipfs_gateway.get(cid).await
+    async fn get_bytes(&self, cid: &str) -> anyhow::Result<Vec<u8>> {
+        self.ipfs_client.get_bytes(cid).await
     }
 }
 
 /// A map from a DID to the IPFS content id that contains its chain of custody.
 pub type DIDIndex = HashMap<IotaDID, String>;
-
-pub struct VerifiableChainOfCustody {
-    pub(crate) proof: Proof<Blake2b256>,
-    pub(crate) chain_of_custody: ChainOfCustody,
-}
-
-impl VerifiableChainOfCustody {
-    pub fn new(proof: Proof<Blake2b256>, chain_of_custody: ChainOfCustody) -> Self {
-        Self {
-            proof,
-            chain_of_custody,
-        }
-    }
-}
-
-impl Packable for VerifiableChainOfCustody {
-    type UnpackError = anyhow::Error;
-
-    fn pack<P: packable::packer::Packer>(&self, packer: &mut P) -> Result<(), P::Error> {
-        self.proof.pack(packer)?;
-
-        let bytes = self
-            .chain_of_custody
-            .to_json_vec()
-            .expect("TODO: unclear how to use P::Error");
-
-        let len: u64 = bytes.len() as u64;
-
-        len.pack(packer)?;
-        packer.pack_bytes(bytes.as_slice())?;
-
-        Ok(())
-    }
-
-    fn unpack<U: packable::unpacker::Unpacker, const VERIFY: bool>(
-        unpacker: &mut U,
-    ) -> Result<Self, packable::error::UnpackError<Self::UnpackError, U::Error>> {
-        let proof = <Proof<Blake2b256>>::unpack::<_, VERIFY>(unpacker)?;
-
-        let len: usize = u64::unpack::<_, VERIFY>(unpacker).coerce()? as usize;
-
-        let mut bytes = vec![0; len];
-        unpacker.unpack_bytes(&mut bytes)?;
-        let chain_of_custody = ChainOfCustody::from_json_slice(&bytes)
-            .map_err(|err| UnpackError::Packable(anyhow::anyhow!(err)))?;
-
-        Ok(Self {
-            proof,
-            chain_of_custody,
-        })
-    }
-}

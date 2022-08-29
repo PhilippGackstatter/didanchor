@@ -1,38 +1,37 @@
+use crate::AddResponse;
+use rand::Rng;
 use reqwest::{
     multipart::{Form, Part},
     Client,
 };
-
-use crate::AddResponse;
+use url::Url;
 
 #[derive(Debug, Clone)]
 pub struct IpfsCluster {
     client: Client,
-    hostname: String,
+    node_addrs: Vec<Url>,
 }
 
 impl IpfsCluster {
-    pub fn new() -> Self {
-        let client = Client::new();
-
-        Self {
-            client,
-            hostname: "http://127.0.0.1:9094".to_owned(),
+    pub fn new(node_addrs: Vec<Url>) -> anyhow::Result<Self> {
+        if node_addrs.is_empty() {
+            anyhow::bail!("`node_addrs` cannot be empty");
         }
+
+        let client: Client = Client::new();
+
+        Ok(Self { client, node_addrs })
     }
 
-    pub fn new_with_host(hostname: impl Into<String>) -> Self {
-        let client = Client::new();
-
-        Self {
-            client,
-            hostname: hostname.into(),
-        }
+    pub fn get_random_node(&self) -> &Url {
+        // Indexing is fine, since we assert in the constructor that the collection is not empty.
+        &self.node_addrs[rand::thread_rng().gen_range(0..self.node_addrs.len())]
     }
 
     /// Add `data` to the cluster and pin it to every peer.
     pub async fn add(&self, data: Vec<u8>) -> anyhow::Result<AddResponse> {
-        let endpoint = format!("{}/add", self.hostname);
+        let node_url: &Url = self.get_random_node();
+        let endpoint: Url = node_url.join("add")?;
 
         // The name doesn't matter.
         let form = Form::new().part("_data", Part::bytes(data));
@@ -59,7 +58,8 @@ impl IpfsCluster {
 
     /// Unpins the given `cid` from the cluster.
     pub async fn unpin(&self, cid: &str) -> anyhow::Result<()> {
-        let endpoint = format!("{}/pins/ipfs/{}", self.hostname, cid);
+        let node_url: &Url = self.get_random_node();
+        let endpoint: Url = node_url.join("pins/ipfs/")?.join(cid)?;
 
         let request = self.client.delete(endpoint).build()?;
 
@@ -75,11 +75,5 @@ impl IpfsCluster {
                 response.status()
             ))
         }
-    }
-}
-
-impl Default for IpfsCluster {
-    fn default() -> Self {
-        Self::new()
     }
 }

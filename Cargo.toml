@@ -1,2 +1,2 @@
 [workspace]
-members = ["didanchor", "merkle_tree", "ipfs_cluster", "examples"]
+members = ["did_common", "didanchor", "merkle_tree", "ipfs_cluster", "ipfs_client", "examples"]

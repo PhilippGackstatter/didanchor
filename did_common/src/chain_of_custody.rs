@@ -8,7 +8,7 @@ pub struct ChainOfCustody(pub Vec<ResolvedIotaDocument>);
 
 impl ChainOfCustody {
     // TODO: Only used for hashing, could take a Digest instance directly and digest bytes incrementally.
-    pub fn serialize_to_vec(&self) -> anyhow::Result<SerializedChainOfCustody> {
+    pub fn serialize_to_vec(&self) -> anyhow::Result<Vec<u8>> {
         let mut serialized = Vec::new();
 
         for doc in self.0.iter() {
@@ -42,5 +42,3 @@ impl ChainOfCustody {
             .map(|did| did.into(), |g| g))
     }
 }
-
-pub type SerializedChainOfCustody = Vec<u8>;

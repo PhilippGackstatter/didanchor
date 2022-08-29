@@ -1,3 +1,5 @@
+use did_common::{ChainOfCustody, VerifiableChainOfCustody};
+use identity_core::convert::ToJson;
 use std::{collections::HashMap, time::Instant};
 
 use anyhow::Context;
@@ -7,8 +9,8 @@ use iota_client::block::output::AliasId;
 use merkle_tree::Proof;
 
 use crate::{
-    resolve_alias_content, AliasContent, AnchorConfig, AnchorOutput, ChainOfCustody, ChainStorage,
-    DIDIndex, MerkleDIDs, VerifiableChainOfCustody,
+    resolve_alias_content, AliasContent, AnchorConfig, AnchorOutput, ChainStorage, DIDIndex,
+    IpfsNodeAddress, MerkleDIDs,
 };
 
 pub struct Anchor {
@@ -36,7 +38,10 @@ impl Anchor {
         let content: Option<AliasContent> =
             resolve_alias_content(&anchor_output.client, config.alias_id).await?;
 
-        let storage = ChainStorage::new(config.ipfs_gateway_addrs.clone());
+        let storage = ChainStorage::new(
+            config.ipfs_cluster_addrs.clone(),
+            config.ipfs_node_addrs.clone(),
+        )?;
 
         let (index, index_cid): (DIDIndex, Option<String>) = if let Some(content) = content {
             (
@@ -118,7 +123,14 @@ impl Anchor {
 
         let content = AliasContent::new(
             index_cid,
-            self.config.ipfs_gateway_addrs.clone(),
+            // self.config.ipfs_gateway_addrs.clone(),
+            // TODO:
+            vec![IpfsNodeAddress {
+                hostname: "http://127.0.0.1".to_owned(),
+                swarm_port: 4001,
+                gateway_port: 0,
+                cluster_port: 0,
+            }],
             self.merkle.merkle_root(),
         );
 
