@@ -21,8 +21,9 @@ impl AliasContent {
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct IpfsNodeAddress {
-    pub hostname: String,
+    pub host: String,
     pub swarm_port: u16,
     pub gateway_port: u16,
     pub cluster_port: u16,
+    pub peer_id: String,
 }

@@ -1,5 +1,4 @@
 use did_common::{ChainOfCustody, VerifiableChainOfCustody};
-use identity_core::convert::ToJson;
 use std::{collections::HashMap, time::Instant};
 
 use anyhow::Context;
@@ -126,10 +125,11 @@ impl Anchor {
             // self.config.ipfs_gateway_addrs.clone(),
             // TODO:
             vec![IpfsNodeAddress {
-                hostname: "http://127.0.0.1".to_owned(),
+                host: "127.0.0.1".to_owned(),
                 swarm_port: 4001,
                 gateway_port: 0,
                 cluster_port: 0,
+                peer_id: "12D3KooWL3EovpbdH1Axsk51xv9ascEsv9a81BuQdSZyNDtRSaHu".to_owned(),
             }],
             self.merkle.merkle_root(),
         );

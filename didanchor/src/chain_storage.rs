@@ -1,5 +1,6 @@
 use std::collections::HashMap;
 
+use bytes::Bytes;
 use did_common::VerifiableChainOfCustody;
 use identity_core::convert::{FromJson, ToJson};
 use identity_iota_core::did::IotaDID;
@@ -59,7 +60,7 @@ impl ChainStorage {
             return Ok(None);
         };
 
-        let bytes: Vec<u8> = self.get_bytes(cid).await?;
+        let bytes: Bytes = self.get_bytes(cid).await?;
 
         let mut unpacker = SliceUnpacker::new(bytes.as_ref());
         let coc: VerifiableChainOfCustody =
@@ -71,7 +72,7 @@ impl ChainStorage {
     pub async fn get_index(&self, index_cid: &str) -> anyhow::Result<DIDIndex> {
         log::debug!("retrieving index from {}", index_cid);
 
-        let json = self.get_bytes(index_cid).await?;
+        let json: Bytes = self.get_bytes(index_cid).await?;
 
         Ok(DIDIndex::from_json_slice(&json)?)
     }
@@ -86,8 +87,8 @@ impl ChainStorage {
         Ok(cid)
     }
 
-    async fn get_bytes(&self, cid: &str) -> anyhow::Result<Vec<u8>> {
-        self.ipfs_client.get_bytes(cid).await
+    async fn get_bytes(&self, cid: &str) -> anyhow::Result<Bytes> {
+        self.ipfs_client.cat(cid).await
     }
 }
 

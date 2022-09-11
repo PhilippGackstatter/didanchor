@@ -18,7 +18,7 @@ async fn main() -> anyhow::Result<()> {
 
     let time = Instant::now();
 
-    let resolver = Resolver::new(&config.iota_endpoint)?;
+    let resolver = Resolver::new(&config.iota_endpoint, "http://127.0.0.1:5000")?;
 
     match resolver.resolve(&did).await? {
         Some(document) => {

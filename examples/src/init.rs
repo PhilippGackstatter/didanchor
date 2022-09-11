@@ -14,8 +14,8 @@ use iota_client::secret::SecretManager;
 use iota_client::Client;
 use url::Url;
 
-static DEFAULT_ENDPOINT: &str = "https://api.alphanet.iotaledger.net";
-static FAUCET_URL: &str = "https://faucet.alphanet.iotaledger.net/api/enqueue";
+static DEFAULT_ENDPOINT: &str = "https://api.testnet.shimmer.network/";
+static FAUCET_URL: &str = "https://faucet.testnet.shimmer.network/api/enqueue";
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {

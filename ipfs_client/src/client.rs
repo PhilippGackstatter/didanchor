@@ -1,13 +1,12 @@
-use futures::TryStreamExt;
-use http::uri::Scheme;
-use ipfs_api_backend_hyper::{IpfsApi, IpfsClient as Client, TryFromUri};
+use anyhow::Context;
+use rand::Rng;
+use reqwest::{Client, Response};
 use url::Url;
 
 #[derive(Clone)]
 pub struct IpfsClient {
     client: Client,
-    // TODO: For now only one address is used, but eventually these could be round-robined in retries.
-    _node_addrs: Vec<Url>,
+    node_addrs: Vec<Url>,
 }
 
 impl IpfsClient {
@@ -16,28 +15,68 @@ impl IpfsClient {
             anyhow::bail!("`node_addrs` cannot be empty");
         }
 
-        let client: Client = Client::from_host_and_port(
-            Scheme::HTTP,
-            node_addrs[0]
-                .host_str()
-                .ok_or_else(|| anyhow::anyhow!("expected a valid hostname"))?,
-            node_addrs[0]
-                .port()
-                .ok_or_else(|| anyhow::anyhow!("expected a port"))?,
-        )?;
+        let client: Client = Client::new();
 
         Ok(Self {
             client,
-            _node_addrs: node_addrs,
+            node_addrs: node_addrs,
         })
     }
 
-    pub async fn get_bytes(&self, cid: &str) -> anyhow::Result<Vec<u8>> {
-        Ok(self
+    pub fn get_random_node(&self) -> &Url {
+        // Indexing is fine, since we assert in the constructor that the collection is not empty.
+        &self.node_addrs[rand::thread_rng().gen_range(0..self.node_addrs.len())]
+    }
+
+    /// Open connection to a given address.
+    ///
+    /// Example address: `/ip4/127.0.0.1/udp/4001/quic/p2p/12D3KooWL3EovpbdH1Axsk51xv9ascEsv9a81BuQdSZyNDtRSaHu`
+    ///
+    /// In particular, the address needs to include the Peer Id.
+    ///
+    /// <https://docs.ipfs.tech/reference/kubo/rpc/#api-v0-swarm-connect>
+    pub async fn swarm_connect(&self, addr: impl AsRef<str>) -> anyhow::Result<()> {
+        let node_url: &Url = self.get_random_node();
+        let endpoint: Url = node_url.join("api/v0/swarm/connect")?;
+
+        let request = self
             .client
-            .cat(cid)
-            .map_ok(|chunk| chunk.to_vec())
-            .try_concat()
-            .await?)
+            .post(endpoint)
+            .query(&[("arg", addr.as_ref())])
+            .build()?;
+
+        self.execute_request(request)
+            .await
+            .context("adding peer failed")?;
+
+        Ok(())
+    }
+
+    /// Show IPFS object data.
+    ///
+    /// <https://docs.ipfs.tech/reference/kubo/rpc/#api-v0-cat>
+    pub async fn cat(&self, cid: &str) -> anyhow::Result<bytes::Bytes> {
+        let node_url: &Url = self.get_random_node();
+        let endpoint: Url = node_url.join("api/v0/cat")?;
+
+        let request = self
+            .client
+            .post(endpoint)
+            .query(&[("arg", cid), ("progress", "false")])
+            .build()?;
+
+        let response = self.execute_request(request).await.context("cat failed")?;
+
+        Ok(response.bytes().await?)
+    }
+
+    async fn execute_request(&self, request: reqwest::Request) -> anyhow::Result<Response> {
+        let response: Response = self.client.execute(request).await?;
+
+        if response.status().is_success() {
+            Ok(response)
+        } else {
+            anyhow::bail!("{}", response.status())
+        }
     }
 }
