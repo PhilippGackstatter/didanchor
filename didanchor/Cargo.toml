@@ -23,6 +23,7 @@ reqwest = { version = "0.11.11", default-features = false, features = ["multipar
 serde = "1.0"
 tokio = { version = "1", default-features = false, features = ["fs"] }
 url = "2.2.2"
+toml = "0.5.9"
 
 [dependencies.iota-client]
 git = "https://github.com/iotaledger/iota.rs"

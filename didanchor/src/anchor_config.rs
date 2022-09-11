@@ -1,6 +1,5 @@
 use std::path::Path;
 
-use identity_core::convert::{FromJson, ToJson};
 use iota_client::block::output::AliasId;
 use url::Url;
 
@@ -14,22 +13,20 @@ pub struct AnchorConfig {
 }
 
 impl AnchorConfig {
-    pub const DEFAULT_PATH: &'static str = "./anchor_config.json";
+    pub const DEFAULT_PATH: &'static str = "./anchor_config.toml";
 
     pub async fn read(path: impl AsRef<Path>) -> anyhow::Result<Self> {
         log::debug!("reading config from {}", path.as_ref().display());
 
         match tokio::fs::read(path).await {
-            Ok(content) => Ok(AnchorConfig::from_json(std::str::from_utf8(
-                content.as_slice(),
-            )?)?),
+            Ok(content) => Ok(toml::from_slice::<AnchorConfig>(content.as_slice())?),
             Err(err) => Err(anyhow::anyhow!(err)),
         }
     }
 
     pub async fn write(&self, path: impl AsRef<Path>) -> anyhow::Result<()> {
         log::debug!("writing config to {}", path.as_ref().display());
-        tokio::fs::write(path, self.to_json_pretty()?).await?;
+        tokio::fs::write(path, toml::to_string_pretty(&self)?).await?;
         Ok(())
     }
 

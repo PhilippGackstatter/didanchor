@@ -1,4 +1,4 @@
 /target
 /Cargo.lock
 /data
-/anchor_config.json
+/anchor_config.toml
