@@ -23,9 +23,9 @@ async fn main() -> anyhow::Result<()> {
     let (_keypair4, doc4) = gen_document();
 
     node.update_document(doc1.clone()).await?;
-    node.update_document(doc2).await?;
-    node.update_document(doc3).await?;
-    node.update_document(doc4).await?;
+    node.update_document(doc2.clone()).await?;
+    node.update_document(doc3.clone()).await?;
+    node.update_document(doc4.clone()).await?;
 
     // node.commit_changes().await?;
 
@@ -49,7 +49,10 @@ async fn main() -> anyhow::Result<()> {
 
     let alias_id = node.commit_changes().await?;
 
-    println!("did:iota:{}:{}", alias_id, doc1.document.id().tag());
+    println!("Published DIDs:");
+    for doc in [doc1, doc2, doc3, doc4] {
+        println!("did:iota:{}:{}", alias_id, doc.document.id().tag());
+    }
 
     Ok(())
 }

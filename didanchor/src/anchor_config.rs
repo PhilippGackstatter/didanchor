@@ -1,15 +1,16 @@
 use std::path::Path;
 
 use iota_client::block::output::AliasId;
-use url::Url;
+
+use crate::{IpfsNodeManagementAddress, IpfsNodePublicAddress};
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct AnchorConfig {
     pub alias_id: AliasId,
     pub mnemonic: String,
     pub iota_endpoint: String,
-    pub ipfs_node_addrs: Vec<Url>,
-    pub ipfs_cluster_addrs: Vec<Url>,
+    pub ipfs_node_public_addrs: Vec<IpfsNodePublicAddress>,
+    pub ipfs_node_management_addrs: Vec<IpfsNodeManagementAddress>,
 }
 
 impl AnchorConfig {

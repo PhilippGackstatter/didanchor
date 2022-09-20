@@ -16,14 +16,15 @@ ipfs_client = { path = "../ipfs_client" }
 ipfs_cluster = { path = "../ipfs_cluster" }
 log = "0.4"
 merkle_tree = { path = "../merkle_tree" }
+multiaddr = "0.14.0"
 packable = "0.5.0"
 prefix-hex = "0.4"
 rand = "0.8.5"
 reqwest = { version = "0.11.11", default-features = false, features = ["multipart"] }
 serde = "1.0"
 tokio = { version = "1", default-features = false, features = ["fs"] }
-url = "2.2.2"
 toml = "0.5.9"
+url = "2.2.2"
 
 [dependencies.iota-client]
 git = "https://github.com/iotaledger/iota.rs"

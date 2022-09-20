@@ -17,10 +17,7 @@ impl IpfsClient {
 
         let client: Client = Client::new();
 
-        Ok(Self {
-            client,
-            node_addrs: node_addrs,
-        })
+        Ok(Self { client, node_addrs })
     }
 
     pub fn get_random_node(&self) -> &Url {
@@ -35,6 +32,7 @@ impl IpfsClient {
     /// In particular, the address needs to include the Peer Id.
     ///
     /// <https://docs.ipfs.tech/reference/kubo/rpc/#api-v0-swarm-connect>
+    // TODO: Use Multiaddr instead of str.
     pub async fn swarm_connect(&self, addr: impl AsRef<str>) -> anyhow::Result<()> {
         let node_url: &Url = self.get_random_node();
         let endpoint: Url = node_url.join("api/v0/swarm/connect")?;
@@ -68,6 +66,23 @@ impl IpfsClient {
         let response = self.execute_request(request).await.context("cat failed")?;
 
         Ok(response.bytes().await?)
+    }
+
+    /// Output config file contents.
+    ///
+    /// <https://docs.ipfs.tech/reference/kubo/rpc/#api-v0-config-show>
+    pub async fn config_show(&self) -> anyhow::Result<serde_json::Value> {
+        let node_url: &Url = self.get_random_node();
+        let endpoint: Url = node_url.join("api/v0/config/show")?;
+
+        let request = self.client.post(endpoint).build()?;
+
+        let response = self
+            .execute_request(request)
+            .await
+            .context("config show failed")?;
+
+        response.json().await.map_err(Into::into)
     }
 
     async fn execute_request(&self, request: reqwest::Request) -> anyhow::Result<Response> {

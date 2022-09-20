@@ -1,7 +1,6 @@
-use std::str::FromStr;
-
 use didanchor::AnchorConfig;
-
+use didanchor::IpfsNodeManagementAddress;
+use didanchor::IpfsNodePublicAddress;
 use identity_core::crypto::KeyType;
 use iota_client::block::address::Address;
 use iota_client::block::output::AliasId;
@@ -12,6 +11,8 @@ use iota_client::node_api::indexer::query_parameters::QueryParameter;
 use iota_client::secret::mnemonic::MnemonicSecretManager;
 use iota_client::secret::SecretManager;
 use iota_client::Client;
+use multiaddr::multihash::Multihash;
+use multiaddr::{Multiaddr, Protocol};
 use url::Url;
 
 static DEFAULT_ENDPOINT: &str = "https://api.testnet.shimmer.network/";
@@ -25,25 +26,80 @@ async fn main() -> anyhow::Result<()> {
 
     let (mnemonic, _, _) = get_address_with_funds(&client).await?;
 
+    // Ports match docker-compose.yml.
+    let swarm_port: u16 = 4001;
+    let api_port: u16 = 5001;
+    let gateway_port: u16 = 8080;
+    let cluster_port: u16 = 9094;
+
+    let mut pub_node_urls: Vec<IpfsNodePublicAddress> = Vec::new();
+    let mut mgmt_node_urls: Vec<IpfsNodeManagementAddress> = Vec::new();
+
+    // Get the peer ids from the nodes so we don't have to hardcode them.
+    for i in 0..=2u16 {
+        let node_addr = format!("/ip4/127.0.0.1/tcp/{}", api_port + i).parse::<Multiaddr>()?;
+
+        let mut addr_iter = node_addr.iter();
+        let ip_addr = if let Some(Protocol::Ip4(addr)) = addr_iter.next() {
+            addr
+        } else {
+            anyhow::bail!("expected ip4 protocol");
+        };
+
+        let port = if let Some(Protocol::Tcp(port)) = addr_iter.next() {
+            port
+        } else {
+            anyhow::bail!("expected tcp protocol");
+        };
+
+        let node_url = Url::parse(&format!(
+            "http://{}.{}.{}.{}:{port}",
+            ip_addr.octets()[0],
+            ip_addr.octets()[1],
+            ip_addr.octets()[2],
+            ip_addr.octets()[3]
+        ))
+        .unwrap();
+
+        let ipfs_client = ipfs_client::IpfsClient::new(vec![node_url]).unwrap();
+        let config = ipfs_client.config_show().await?;
+        let peer_id: &str = config
+            .get("Identity")
+            .unwrap()
+            .get("PeerID")
+            .unwrap()
+            .as_str()
+            .unwrap();
+
+        let peer_id_bytes: Vec<u8> = bs58::decode(peer_id).into_vec().unwrap();
+        let peer_id_multihash: Multihash = Multihash::from_bytes(&peer_id_bytes).unwrap();
+        let peer_id_protocol: Protocol = Protocol::P2p(peer_id_multihash);
+
+        pub_node_urls.push(IpfsNodePublicAddress {
+            host: Protocol::Ip4(ip_addr),
+            swarm_port: Multiaddr::from_iter([Protocol::Udp(swarm_port + i), Protocol::Quic]),
+            gateway_port: Protocol::Tcp(gateway_port + i),
+            peer_id: peer_id_protocol,
+        });
+
+        mgmt_node_urls.push(IpfsNodeManagementAddress {
+            host: ip_addr.to_string(),
+            api_port: api_port + i,
+            cluster_port: cluster_port + i,
+        });
+    }
+
     let config = AnchorConfig {
         alias_id: AliasId::null(),
         mnemonic,
         iota_endpoint: DEFAULT_ENDPOINT.to_owned(),
-        ipfs_node_addrs: vec![
-            Url::from_str("http://127.0.0.1:5001")?,
-            Url::from_str("http://127.0.0.1:5002")?,
-            Url::from_str("http://127.0.0.1:5003")?,
-        ],
-        ipfs_cluster_addrs: vec![
-            Url::from_str("http://127.0.0.1:9094")?,
-            Url::from_str("http://127.0.0.1:9095")?,
-            Url::from_str("http://127.0.0.1:9096")?,
-        ],
+        ipfs_node_public_addrs: pub_node_urls,
+        ipfs_node_management_addrs: mgmt_node_urls,
     };
 
     config.write_default_location().await?;
 
-    println!("successfully initialized {}", AnchorConfig::DEFAULT_PATH);
+    println!("initialized {}", AnchorConfig::DEFAULT_PATH);
 
     Ok(())
 }

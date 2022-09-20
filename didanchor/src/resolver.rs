@@ -13,6 +13,7 @@ use iota_client::{
     Client as IotaClient,
 };
 use ipfs_client::IpfsClient;
+use multiaddr::Multiaddr;
 use packable::{unpacker::SliceUnpacker, Packable};
 
 use crate::{AliasContent, DIDIndex};
@@ -62,23 +63,26 @@ impl Resolver {
     ) -> anyhow::Result<Option<CoreDocument>> {
         // Peer the local node with a cluster node to speed up the subsequent lookup.
         let node_multiaddrs = content.ipfs_node_addrs.iter().map(|addr| {
-            format!(
-                "/ip4/{host}/udp/{swarm_port}/quic/p2p/{peer_id}",
-                host = addr.host,
-                swarm_port = addr.swarm_port,
-                peer_id = addr.peer_id
-            )
+            let mut multiaddr = Multiaddr::empty();
+            multiaddr.push(addr.host.clone());
+
+            for protocol in addr.swarm_port.iter() {
+                multiaddr.push(protocol);
+            }
+
+            multiaddr.push(addr.peer_id.clone());
+            multiaddr
         });
 
         // TODO: Poll all swarm connect futures at once, or consider peering with just one random node.
         for addr in node_multiaddrs {
-            self.ipfs_client.swarm_connect(addr).await?;
+            self.ipfs_client.swarm_connect(addr.to_string()).await?;
         }
 
         let index_bytes: Bytes = self.ipfs_client.cat(&content.index_cid).await?;
         let index: DIDIndex = DIDIndex::from_json_slice(&index_bytes)?;
 
-        let cid: &str = if let Some(cid) = index.get(&did) {
+        let cid: &str = if let Some(cid) = index.get(did) {
             cid
         } else {
             return Ok(None);

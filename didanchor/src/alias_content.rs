@@ -1,14 +1,16 @@
+use crate::IpfsNodePublicAddress;
+
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct AliasContent {
     pub index_cid: String,
-    pub ipfs_node_addrs: Vec<IpfsNodeAddress>,
+    pub ipfs_node_addrs: Vec<IpfsNodePublicAddress>,
     pub merkle_root: Vec<u8>,
 }
 
 impl AliasContent {
     pub fn new(
         index_cid: String,
-        ipfs_node_addrs: Vec<IpfsNodeAddress>,
+        ipfs_node_addrs: Vec<IpfsNodePublicAddress>,
         merkle_root: Vec<u8>,
     ) -> Self {
         Self {
@@ -17,13 +19,4 @@ impl AliasContent {
             merkle_root,
         }
     }
-}
-
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
-pub struct IpfsNodeAddress {
-    pub host: String,
-    pub swarm_port: u16,
-    pub gateway_port: u16,
-    pub cluster_port: u16,
-    pub peer_id: String,
 }
