@@ -1,4 +1,6 @@
-# DID Anchor
+<div align="center">
+   <h1>DID Anchor</h1>
+</div>
 
 ## How it works
 
@@ -36,7 +38,7 @@ During resolution there are multiple ways to obtain the bytes to a given CID. Th
 
 ## Running
 
-1. `docker-compose up` to bring up the IPFS cluster.
+1. `export CLUSTER_SECRET=$(od -vN 32 -An -tx1 /dev/urandom | tr -d ' \n')` and a subsequent `docker-compose up` to bring up the IPFS cluster.
 2. Initialize the necessary config by running `cargo run --example init`.
    - This generates a mnemonic as the seed for private keys. The first address derived from the private keys will be pre-filled with some test funds from the testnet faucet. That is necessary to publish Alias Outputs to the IOTA ledger.
    - It sets defaults for the other required configuration parameters, such as the IOTA network to use. See the generated `anchor_config.toml` for their values.
