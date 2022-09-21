@@ -38,12 +38,12 @@ During resolution there are multiple ways to obtain the bytes to a given CID. Th
 
 ## Running
 
-1. `export CLUSTER_SECRET=$(od -vN 32 -An -tx1 /dev/urandom | tr -d ' \n')` and a subsequent `docker-compose up` to bring up the IPFS cluster.
+1. Run `export CLUSTER_SECRET=$(od -vN 32 -An -tx1 /dev/urandom | tr -d ' \n')` to generate a secret for the cluster. Then run `docker-compose up` to bring up the IPFS cluster.
 2. Initialize the necessary config by running `cargo run --example init`.
    - This generates a mnemonic as the seed for private keys. The first address derived from the private keys will be pre-filled with some test funds from the testnet faucet. That is necessary to publish Alias Outputs to the IOTA ledger.
    - It sets defaults for the other required configuration parameters, such as the IOTA network to use. See the generated `anchor_config.toml` for their values.
 3. `cargo run --example anchor` adds 4 test DID documents to the DID Anchor, which holds it in memory until committed. When the changes are committed, the DID documents are published to the IPFS cluster. Subsequently, they are anchored to the IOTA ledger in an Alias Output.
-4. The anchor example prints multiple DIDs that were published. We can pass any of those to the next example: `cargo run --example resolve -- did:iota:...` to resolve it. Note that this requires a running local ipfs daemon, which can be run with `ipfs daemon`. This will verify two things: The entire chain of custody of the DID and the merkle proof stored alongside the chain of custody, which ensures that the anchoring node has indeed committed to this version of the DID document.
+4. The anchor example prints multiple DIDs that were published. We can pass any of those to the next example: `cargo run --example resolve did:iota:...` to resolve it. Note that this requires a running local ipfs daemon, which can be run with `ipfs daemon` ([installation instructions](https://docs.ipfs.tech/install/)). This will verify two things: The entire chain of custody of the DID and the merkle proof stored alongside the chain of custody, which ensures that the anchoring node has indeed committed to this version of the DID document.
 
 ## State of the library
 
