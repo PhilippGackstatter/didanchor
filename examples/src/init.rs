@@ -27,9 +27,9 @@ async fn main() -> anyhow::Result<()> {
     let (mnemonic, _, _) = get_address_with_funds(&client).await?;
 
     // Ports match docker-compose.yml.
-    let swarm_port: u16 = 4001;
-    let api_port: u16 = 5001;
-    let gateway_port: u16 = 8080;
+    let swarm_port: u16 = 4002;
+    let api_port: u16 = 5002;
+    let gateway_port: u16 = 8081;
     let cluster_port: u16 = 9094;
 
     let mut pub_node_urls: Vec<IpfsNodePublicAddress> = Vec::new();

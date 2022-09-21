@@ -33,9 +33,9 @@ services:
     container_name: ipfs0
     image: ipfs/go-ipfs:release
     ports:
-      - "4001:4001" # ipfs swarm - expose if needed/wanted
-      - "5001:5001" # ipfs api - expose if needed/wanted
-      - "8080:8080" # ipfs gateway - expose if needed/wanted
+      - "4002:4001" # ipfs swarm - expose if needed/wanted
+      - "5002:5001" # ipfs api - expose if needed/wanted
+      - "8081:8080" # ipfs gateway - expose if needed/wanted
     volumes:
       - ./data/ipfs0:/data/ipfs
 
@@ -63,9 +63,9 @@ services:
     container_name: ipfs1
     image: ipfs/go-ipfs:release
     ports:
-      - "4002:4001" # ipfs swarm - expose if needed/wanted
-      - "5002:5001" # ipfs api - expose if needed/wanted
-      - "8081:8080" # ipfs gateway - expose if needed/wanted
+      - "4003:4001" # ipfs swarm - expose if needed/wanted
+      - "5003:5001" # ipfs api - expose if needed/wanted
+      - "8082:8080" # ipfs gateway - expose if needed/wanted
     volumes:
       - ./data/ipfs1:/data/ipfs
 
@@ -93,9 +93,9 @@ services:
     container_name: ipfs2
     image: ipfs/go-ipfs:release
     ports:
-      - "4003:4001" # ipfs swarm - expose if needed/wanted
-      - "5003:5001" # ipfs api - expose if needed/wanted
-      - "8082:8080" # ipfs gateway - expose if needed/wanted
+      - "4004:4001" # ipfs swarm - expose if needed/wanted
+      - "5004:5001" # ipfs api - expose if needed/wanted
+      - "8083:8080" # ipfs gateway - expose if needed/wanted
     volumes:
       - ./data/ipfs2:/data/ipfs
 
